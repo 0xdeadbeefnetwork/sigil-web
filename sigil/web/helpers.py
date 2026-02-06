@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 from pathlib import Path
+from typing import Dict
 from functools import wraps
 
 from flask import request, session, redirect, url_for, flash
@@ -155,10 +156,27 @@ def set_signing_pin(pin: str):
     SIGNING_PIN_FILE.chmod(0o600)
 
 
+_pin_attempts: Dict[str, list] = {}
+PIN_MAX_ATTEMPTS = 5
+PIN_LOCKOUT_SECONDS = 300  # 5 minutes
+
+
 def check_signing_pin(pin: str) -> bool:
-    """Verify signing PIN"""
+    """Verify signing PIN with rate limiting (5 attempts per 5 minutes)"""
     if not SIGNING_PIN_FILE.exists():
         return True  # No PIN set = no check required
+
+    # Rate limit by client IP
+    client_ip = request.remote_addr or 'unknown'
+    now = time.time()
+    attempts = _pin_attempts.get(client_ip, [])
+    # Prune old attempts
+    attempts = [t for t in attempts if now - t < PIN_LOCKOUT_SECONDS]
+    _pin_attempts[client_ip] = attempts
+
+    if len(attempts) >= PIN_MAX_ATTEMPTS:
+        return False  # Locked out
+
     stored = SIGNING_PIN_FILE.read_text().strip()
     if ':' in stored:
         salt, stored_hash = stored.split(':', 1)
@@ -166,7 +184,14 @@ def check_signing_pin(pin: str) -> bool:
     else:
         stored_hash = stored
         provided_hash = hashlib.sha256(pin.encode()).hexdigest()
-    return hmac.compare_digest(stored_hash, provided_hash)
+
+    result = hmac.compare_digest(stored_hash, provided_hash)
+    if not result:
+        _pin_attempts[client_ip] = attempts + [now]
+    else:
+        # Clear attempts on success
+        _pin_attempts[client_ip] = []
+    return result
 
 
 def clear_signing_pin():

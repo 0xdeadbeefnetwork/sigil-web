@@ -8,7 +8,7 @@ Deposit -> Hop1 -> Hop2 -> Hop3 -> Main Wallet
 
 import json
 import time
-import random
+import secrets
 import threading
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -81,6 +81,10 @@ class TumbleState:
     def save(self):
         SIGIL_DIR.mkdir(parents=True, exist_ok=True)
         TUMBLE_STATE_FILE.write_text(json.dumps(self.to_dict(), indent=2))
+        try:
+            TUMBLE_STATE_FILE.chmod(0o600)
+        except OSError:
+            pass
 
     @classmethod
     def load(cls) -> "TumbleState":
@@ -121,12 +125,12 @@ def find_available_slots(n: int, locked_slots: set) -> List[str]:
 def get_random_delay(preset: str) -> int:
     """Get random delay in seconds based on preset"""
     min_delay, max_delay = DELAY_PRESETS.get(preset, DELAY_PRESETS["normal"])
-    return random.randint(min_delay, max_delay)
+    return secrets.randbelow(max_delay - min_delay + 1) + min_delay
 
 
 def generate_job_id() -> str:
     """Generate unique job ID"""
-    return f"tumble_{int(time.time())}_{random.randint(1000, 9999)}"
+    return f"tumble_{int(time.time())}_{secrets.randbelow(9000) + 1000}"
 
 
 # Background tumbler thread

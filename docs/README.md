@@ -50,7 +50,6 @@
 - **CLI Wallet** - Full command-line wallet (`sigil-wallet`)
 - **Remote Server** - SE050 signing oracle API over Tor
 - **Remote Client** - CLI client for remote wallet access
-- **Desktop GUI** - Tkinter interface for VNC/local access
 
 ## Architecture
 
@@ -174,7 +173,6 @@ sigil-web/
 │   │   │   ├── tumbler_bp.py   #     /tumbler/*
 │   │   │   ├── privacy_bp.py   #     /canary, /privacy
 │   │   │   ├── pubkeys.py      #     /pubkeys, /pubkeys/stream (SSE)
-│   │   │   ├── gui_api.py      #     /api/gui/* (desktop GUI backend)
 │   │   │   └── qr.py           #     /qr (QR code image generation)
 │   │   ├── templates/          #   21 Jinja2 HTML templates
 │   │   └── static/             #   CSS + JS assets
@@ -184,9 +182,6 @@ sigil-web/
 │   ├── client/                 # Remote client
 │   │   ├── client.py           #   SigilClient HTTP class
 │   │   └── cli.py              #   CLI entry point
-│   ├── gui/                    # Desktop GUI
-│   │   ├── api_client.py       #   SigilAPI HTTP client
-│   │   └── desktop.py          #   Tkinter interface
 │   └── cli/                    # CLI wallet
 │       ├── main.py             #   Entry point + argparse
 │       └── commands.py         #   All wallet commands

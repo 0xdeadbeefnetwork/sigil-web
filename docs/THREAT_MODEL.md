@@ -28,9 +28,9 @@ SIGIL is a Bitcoin hardware wallet using the NXP SE050 secure element. This docu
 │                    HOST SYSTEM (Pi)                          │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │  Flask Web App (sigil.web)                             │ │
-│  │  12 Blueprints: auth, dashboard, wallet_mgmt,          │ │
+│  │  11 Blueprints: auth, dashboard, wallet_mgmt,          │ │
 │  │  settings, signing, logs, honeypot, tumbler,           │ │
-│  │  privacy, pubkeys, gui_api, qr                         │ │
+│  │  privacy, pubkeys, qr                                  │ │
 │  ├────────────────────────────────────────────────────────┤ │
 │  │  sigil.bitcoin    sigil.crypto    sigil.privacy        │ │
 │  │  sigil.wallet     sigil.network   sigil.hardware       │ │

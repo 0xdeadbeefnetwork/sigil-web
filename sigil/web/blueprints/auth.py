@@ -50,7 +50,7 @@ def login():
     )
 
 
-@auth_bp.route('/logout', methods=['GET', 'POST'])
+@auth_bp.route('/logout', methods=['POST'])
 def logout():
     session.clear()
     return redirect(url_for('auth_bp.login'))

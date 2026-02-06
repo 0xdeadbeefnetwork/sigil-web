@@ -19,7 +19,6 @@ from sigil.web.blueprints.honeypot import honeypot_bp
 from sigil.web.blueprints.tumbler_bp import tumbler_bp, _init_tumbler
 from sigil.web.blueprints.privacy_bp import privacy_bp
 from sigil.web.blueprints.pubkeys import pubkeys_bp
-from sigil.web.blueprints.gui_api import gui_api_bp
 from sigil.web.blueprints.qr import qr_bp
 
 
@@ -42,7 +41,6 @@ def create_app():
     app.register_blueprint(tumbler_bp)
     app.register_blueprint(privacy_bp)
     app.register_blueprint(pubkeys_bp)
-    app.register_blueprint(gui_api_bp)
     app.register_blueprint(qr_bp)
 
     # ---- Security headers on every response ----

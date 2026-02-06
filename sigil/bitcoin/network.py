@@ -52,13 +52,14 @@ def _get_tor_opener():
     except ImportError:
         pass
 
-    # Mark Tor as unavailable and warn once
+    # Tor requested but unavailable - fail loud, do NOT silently fall back to clearnet
     _tor_available = False
     if not _tor_warned:
         _tor_warned = True
-        # print("  [!] PySocks not installed. Install with: pip install PySocks")
-        # print("      Falling back to clearnet API (Tor disabled)")
-    return None
+        print("  [!] CRITICAL: Tor enabled but PySocks not installed!")
+        print("      Install with: pip install PySocks")
+        print("      Refusing to fall back to clearnet to protect privacy.")
+    raise RuntimeError("Tor is enabled but unavailable (PySocks not installed). Refusing clearnet fallback.")
 
 
 def _api_base_with_tor() -> str:

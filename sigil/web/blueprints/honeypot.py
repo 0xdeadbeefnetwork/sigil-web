@@ -34,9 +34,9 @@ def honeypot_admin():
         'args': dict(request.args)
     })
     # Return a fake login page that always fails after a delay
-    time.sleep(2)  # Waste their time
+    # No sleep - single gunicorn worker means we'd DoS ourselves
     if request.method == 'POST':
-        time.sleep(3)  # Extra delay on POST
+        # Removed sleep - single worker self-DoS
         return render_template_string("""
         <html><head><title>Admin - Error</title></head>
         <body style="background:#1a1a2e;color:#fff;font-family:monospace;padding:50px;">
@@ -72,7 +72,7 @@ def honeypot_export():
         'form': dict(request.form),
         'args': dict(request.args)
     })
-    time.sleep(3)
+    # Removed sleep
     # Return fake "encrypted" keys that are actually garbage
     fake_keys = {
         "status": "success",
@@ -120,7 +120,7 @@ def honeypot_api_send():
         'form': dict(request.form),
         'headers': {k: v for k, v in request.headers if k.lower() in ['authorization', 'x-api-key', 'content-type']}
     })
-    time.sleep(5)  # Long delay
+    # Removed sleep
     # Return fake success to make them think it worked
     return jsonify({
         "status": "success",
@@ -149,5 +149,5 @@ Disallow: /debug/
 Disallow: /export-keys/
 Disallow: /.env
 """, 200, {'Content-Type': 'text/plain'}
-    time.sleep(1)
+    # Removed sleep
     return "Not Found", 404

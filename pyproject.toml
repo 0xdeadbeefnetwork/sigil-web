@@ -29,7 +29,6 @@ sigil-web = "sigil.web:main"
 sigil-wallet = "sigil.cli.main:main"
 sigil-server = "sigil.server.app:main"
 sigil-client = "sigil.client.cli:main"
-sigil-gui = "sigil.gui.desktop:main"
 
 [tool.setuptools.packages.find]
 include = ["sigil*"]

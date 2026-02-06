@@ -47,7 +47,10 @@
                     <div class="dropdown-content">
                         <a href="{{ url_for('logs_bp.logs') }}">Logs</a>
                         <a href="{{ url_for('settings_bp.settings') }}">Settings</a>
-                        <a href="{{ url_for('auth_bp.logout') }}" style="color: var(--accent-red);">Logout</a>
+                        <form method="POST" action="{{ url_for('auth_bp.logout') }}" style="display:inline;margin:0;padding:0;">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" style="background:none;border:none;color:var(--accent-red);cursor:pointer;font:inherit;padding:8px 16px;width:100%;text-align:left;">Logout</button>
+                        </form>
                     </div>
                 </div>
             </nav>

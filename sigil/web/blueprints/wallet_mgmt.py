@@ -38,11 +38,11 @@ wallet_mgmt_bp = Blueprint('wallet_mgmt_bp', __name__)
 @login_required
 @csrf_required
 def create_wallet():
-    import random
+    import secrets as _secrets
 
     step = 1
     mnemonic = None
-    verify_word = random.randint(1, 24)
+    verify_word = _secrets.randbelow(24) + 1
 
     if request.method == 'POST':
         action = request.form.get('action', '')
@@ -101,8 +101,7 @@ def create_wallet():
                                     flash(f'Failed to export pubkey to {pubkey_path}', 'error')
                                     step = 2
                 except Exception as e:
-                    import traceback
-                    flash(f'Error: {str(e)} - {traceback.format_exc()[:200]}', 'error')
+                    flash('Wallet creation failed. Check logs for details.', 'error')
                     step = 2
             else:
                 flash('Incorrect word. Please try again.', 'error')
