@@ -26,7 +26,7 @@
 ### Core Wallet
 - **Hardware Security** - Private keys never leave the SE050 secure element
 - **Tor Integration** - All network requests routed through Tor (SOCKS5 proxy)
-- **Electrum Backend** - Decentralized Electrum servers (no single API dependency)
+- **Electrum Backend** - Decentralized Electrum servers with TOFU certificate pinning
 - **Air-gapped Signing** - Transaction signing happens entirely on the secure element
 - **BIP84 Native SegWit** - Modern `bc1q` addresses with lower fees
 - **Multi-Slot** - 16 independent key slots on a single SE050
@@ -237,7 +237,8 @@ SCP03 keys are stored in `~/.se050-wallet/`:
 2. **Signing** operations happen on the SE050 - keys never enter host RAM
 3. **SCP03** encrypted/authenticated channel between host and SE050
 4. **Optional Tor** for network privacy (all API calls, Electrum connections)
-5. **Signing PIN** adds a second factor before any signing operation
+5. **TOFU certificate pinning** on Electrum SSL connections (MITM protection)
+6. **Signing PIN** adds a second factor before any signing operation
 
 See [THREAT_MODEL.md](docs/THREAT_MODEL.md) for detailed security analysis.
 

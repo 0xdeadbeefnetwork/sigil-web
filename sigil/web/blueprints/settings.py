@@ -27,6 +27,7 @@ from sigil.web.helpers import (
 )
 from sigil.web.security import csrf_required
 from sigil.web.session_mgmt import se050_session
+from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins
 
 settings_bp = Blueprint('settings_bp', __name__)
 
@@ -82,6 +83,9 @@ def settings():
     except Exception:
         pass
 
+    # Load Electrum certificate pins
+    electrum_pins = get_pinned_servers()
+
     return render_template(
         'settings.html',
         title='Settings', active='settings', version=SIGIL_VERSION,
@@ -90,6 +94,7 @@ def settings():
         network=Config.NETWORK, rpc_url=rpc_url, use_tor=use_tor, api_backend=getattr(Config, 'API_BACKEND', 'electrum'),
         exit_ip=exit_ip, is_tor=is_tor, tor_enabled=use_tor,
         signing_pin_active=signing_pin_enabled(), factory_keys=factory_keys,
+        electrum_pins=electrum_pins,
         session=session
     )
 
@@ -330,3 +335,28 @@ def rotate_keys():
             'warning'
         )
         return redirect(url_for('settings_bp.rotate_keys'))
+
+
+@settings_bp.route('/settings/clear-electrum-pin', methods=['POST'])
+@login_required
+@csrf_required
+def clear_electrum_pin():
+    """Clear a single Electrum server certificate pin"""
+    server_key = request.form.get('server_key', '').strip()
+    if not server_key:
+        flash('No server specified', 'error')
+    elif clear_pin(server_key):
+        flash(f'Certificate pin cleared for {server_key}', 'success')
+    else:
+        flash(f'No pin found for {server_key}', 'error')
+    return redirect(url_for('settings_bp.settings'))
+
+
+@settings_bp.route('/settings/clear-all-electrum-pins', methods=['POST'])
+@login_required
+@csrf_required
+def clear_all_electrum_pins():
+    """Clear all Electrum server certificate pins"""
+    clear_all_pins()
+    flash('All Electrum certificate pins cleared. Certs will be re-pinned on next connection.', 'success')
+    return redirect(url_for('settings_bp.settings'))

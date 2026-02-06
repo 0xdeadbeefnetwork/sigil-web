@@ -67,8 +67,24 @@ SIGIL is a Bitcoin hardware wallet using the NXP SE050 secure element. This docu
 |--------|------------|
 | API response manipulation | Transaction data verified before signing; Electrum uses multiple servers |
 | Traffic analysis / IP leak | Tor integration via SOCKS5 proxy on all outbound connections |
-| MITM on API calls | Tor onion routing provides end-to-end encryption; Electrum uses TLS but with `CERT_NONE` (no verification) |
+| MITM on API calls | Tor onion routing; TOFU certificate pinning on Electrum SSL connections (see below) |
 | Malicious Electrum server | Amount/script verification before signing; server rotation |
+
+#### Electrum TOFU Certificate Pinning
+
+Electrum servers typically use self-signed TLS certificates, making traditional CA-based verification impossible. SIGIL implements **Trust On First Use (TOFU)** certificate pinning:
+
+1. On first SSL connection to a server, the certificate's SHA-256 fingerprint is stored in `~/.sigil/electrum_pins.json`
+2. On subsequent connections, the presented certificate is compared against the stored fingerprint
+3. If the fingerprint changes, the connection is **refused** and an error is raised (possible MITM)
+4. Certificate pins can be managed (viewed/cleared) via **Settings > Electrum Certificate Pins**
+
+**Limitations**:
+- First connection is vulnerable (no prior pin to compare against)
+- If an attacker MITM's the very first connection, the bad cert gets pinned
+- Server-side certificate rotation requires manually clearing the pin
+
+**Recommendation**: First connection to Electrum servers should be done on a trusted network. Pins are displayed in the settings UI for manual verification if desired.
 
 ### 2. Host System Compromise
 

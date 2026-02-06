@@ -162,7 +162,7 @@ def broadcast_transaction(raw_tx_hex: str) -> Optional[str]:
         # Use Electrum backend if configured
         if Config.API_BACKEND == "electrum":
             try:
-                from electrum_client import electrum_broadcast
+                from sigil.network.electrum import electrum_broadcast
                 # print(f"  [TX] Broadcasting via Electrum...")
                 return electrum_broadcast(raw_tx_hex, Config.NETWORK, Config.TOR_ENABLED)
             except Exception as e:
@@ -206,7 +206,7 @@ def get_utxos(address: str) -> List[Dict]:
     # Use Electrum backend if configured
     if Config.API_BACKEND == "electrum":
         try:
-            from electrum_client import electrum_get_utxos
+            from sigil.network.electrum import electrum_get_utxos
             return electrum_get_utxos(address, Config.NETWORK, Config.TOR_ENABLED)
         except Exception as e:
             # print(f"  [ELECTRUM] Error: {e}")
@@ -233,7 +233,7 @@ def get_fee_estimates() -> Dict[str, int]:
     """Get current fee estimates"""
     if Config.API_BACKEND == "electrum":
         try:
-            from electrum_client import electrum_get_fee
+            from sigil.network.electrum import electrum_get_fee
             fast = electrum_get_fee(1, Config.NETWORK, Config.TOR_ENABLED)
             medium = electrum_get_fee(6, Config.NETWORK, Config.TOR_ENABLED)
             slow = electrum_get_fee(12, Config.NETWORK, Config.TOR_ENABLED)

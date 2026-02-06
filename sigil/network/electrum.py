@@ -2,13 +2,22 @@
 """
 Minimal Electrum Client for SIGIL
 =================================
-Lightweight Electrum protocol client with Tor support.
+Lightweight Electrum protocol client with Tor support and TOFU certificate pinning.
+
+Certificate Pinning (Trust On First Use):
+  On first SSL connection to a server, the server's certificate fingerprint
+  (SHA-256 of DER-encoded cert) is saved to ~/.sigil/electrum_pins.json.
+  On subsequent connections, the fingerprint is verified against the stored pin.
+  If the fingerprint changes, the connection is refused (possible MITM).
+  Pins can be cleared per-server or entirely via the web UI settings.
 """
 
 import json
 import socket
 import ssl
 import hashlib
+import time
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from sigil.crypto.encoding import bech32_decode, b58check_decode
@@ -24,9 +33,102 @@ TESTNET_SERVERS = [
     ("electrum.blockstream.info", 60001, 60002, None),
 ]
 
+# Pin storage location
+_SIGIL_DIR = Path.home() / ".sigil"
+_PINS_FILE = _SIGIL_DIR / "electrum_pins.json"
+
+
+# =========================================================================
+#                    TOFU CERTIFICATE PINNING
+# =========================================================================
+
+def _load_pins() -> Dict[str, Any]:
+    """Load stored certificate pins from disk"""
+    if _PINS_FILE.exists():
+        try:
+            return json.loads(_PINS_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _save_pins(pins: Dict[str, Any]):
+    """Save certificate pins to disk with restricted permissions"""
+    _SIGIL_DIR.mkdir(parents=True, exist_ok=True)
+    _PINS_FILE.write_text(json.dumps(pins, indent=2))
+    try:
+        _PINS_FILE.chmod(0o600)
+    except OSError:
+        pass
+
+
+def get_pinned_servers() -> Dict[str, Any]:
+    """Get all pinned server certificates (for UI display)"""
+    return _load_pins()
+
+
+def clear_pin(server_key: str) -> bool:
+    """Remove a single server's certificate pin. Returns True if pin existed."""
+    pins = _load_pins()
+    if server_key in pins:
+        del pins[server_key]
+        _save_pins(pins)
+        return True
+    return False
+
+
+def clear_all_pins():
+    """Remove all stored certificate pins"""
+    _save_pins({})
+
+
+def _get_cert_fingerprint(sock: ssl.SSLSocket) -> str:
+    """Get SHA-256 fingerprint of the server's DER-encoded certificate"""
+    der_cert = sock.getpeercert(binary_form=True)
+    if der_cert is None:
+        raise Exception("No certificate presented by server")
+    return hashlib.sha256(der_cert).hexdigest()
+
+
+def _verify_or_pin_cert(sock: ssl.SSLSocket, host: str, port: int) -> str:
+    """
+    TOFU: verify server cert against stored pin, or pin it on first connect.
+    Returns the fingerprint.
+    Raises Exception if fingerprint doesn't match stored pin (MITM detected).
+    """
+    fingerprint = _get_cert_fingerprint(sock)
+    server_key = f"{host}:{port}"
+
+    pins = _load_pins()
+
+    if server_key in pins:
+        stored = pins[server_key]
+        stored_fp = stored.get("fingerprint", "")
+        if stored_fp != fingerprint:
+            raise Exception(
+                f"CERTIFICATE MISMATCH for {server_key}! "
+                f"Expected {stored_fp[:16]}..., got {fingerprint[:16]}... "
+                f"Possible MITM attack. Connection refused. "
+                f"If the server legitimately rotated its certificate, "
+                f"clear the pin via Settings > Network > Electrum Cert Pins."
+            )
+        # Pin matches — update last_seen
+        pins[server_key]["last_seen"] = int(time.time())
+        _save_pins(pins)
+    else:
+        # First connection — trust and pin
+        pins[server_key] = {
+            "fingerprint": fingerprint,
+            "first_seen": int(time.time()),
+            "last_seen": int(time.time()),
+        }
+        _save_pins(pins)
+
+    return fingerprint
+
 
 class ElectrumClient:
-    """Minimal Electrum protocol client"""
+    """Minimal Electrum protocol client with TOFU certificate pinning"""
 
     def __init__(self, network="mainnet", use_tor=False, tor_proxy="127.0.0.1:9050", timeout=30):
         self.network = network
@@ -45,7 +147,7 @@ class ElectrumClient:
         return MAINNET_SERVERS
 
     def _create_socket(self, host, port, use_ssl=False):
-        """Create socket, optionally through Tor SOCKS5"""
+        """Create socket, optionally through Tor SOCKS5, with TOFU cert pinning"""
         if self.use_tor:
             import socks
             sock = socks.socksocket()
@@ -57,10 +159,17 @@ class ElectrumClient:
         sock.connect((host, port))
 
         if use_ssl:
+            # We use CERT_NONE for the SSL context because Electrum servers
+            # use self-signed certs (no CA to verify against). Instead, we
+            # do TOFU pinning: trust the cert on first connect, reject if
+            # it changes on subsequent connects.
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
             sock = context.wrap_socket(sock, server_hostname=host)
+
+            # TOFU: verify or pin the certificate fingerprint
+            _verify_or_pin_cert(sock, host, port)
 
         return sock
 
@@ -91,13 +200,17 @@ class ElectrumClient:
                 result = self._call("server.version", ["SIGIL", "1.4"])
                 if result:
                     return True
-            except Exception:
+            except Exception as e:
                 if self.sock:
                     try:
                         self.sock.close()
                     except:
                         pass
                     self.sock = None
+                # If this was a cert mismatch, don't silently try next server —
+                # propagate so the user knows about the MITM risk
+                if "CERTIFICATE MISMATCH" in str(e):
+                    raise
                 continue
 
         return False
@@ -155,13 +268,11 @@ class ElectrumClient:
             hrp, witness_version, witness_program = bech32_decode(address)
             if witness_program is None:
                 raise ValueError("Invalid bech32 address: " + address)
-            # witness_program already decoded
             script = bytes([0x00, len(witness_program)]) + witness_program
         elif address.startswith(("bc1p", "tb1p")):  # Bech32m P2TR
             hrp, witness_version, witness_program = bech32_decode(address)
             if witness_program is None:
                 raise ValueError("Invalid bech32m address: " + address)
-            # witness_program already decoded
             script = bytes([0x51, len(witness_program)]) + witness_program
         elif address[0] in ("1", "m", "n"):  # P2PKH
             version, pubkey_hash = b58check_decode(address)

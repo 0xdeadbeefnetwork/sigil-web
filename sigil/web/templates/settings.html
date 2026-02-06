@@ -105,6 +105,54 @@
 </div>
 
 <div class="card">
+    <div class="card-title">Electrum Certificate Pins (TOFU)</div>
+    <p style="color: #999; font-size: 12px; margin-bottom: 15px;">
+        Server TLS certificates are pinned on first connection (Trust On First Use).
+        If a certificate changes unexpectedly, the connection is refused to prevent MITM attacks.
+    </p>
+    {% if electrum_pins %}
+    <table style="font-size: 12px; width: 100%;">
+        <tr style="color: #00ffff;">
+            <th style="text-align: left; padding: 4px;">Server</th>
+            <th style="text-align: left; padding: 4px;">Fingerprint</th>
+            <th style="text-align: left; padding: 4px;">First Seen</th>
+            <th style="padding: 4px;"></th>
+        </tr>
+        {% for server_key, pin_data in electrum_pins.items() %}
+        <tr>
+            <td class="mono" style="padding: 4px; color: #00ff41;">{{ server_key }}</td>
+            <td class="mono" style="padding: 4px; color: #666; font-size: 10px;">{{ pin_data.fingerprint[:16] }}...</td>
+            <td style="padding: 4px; color: #999; font-size: 11px;">
+                {% if pin_data.first_seen %}
+                {{ pin_data.first_seen | int }}
+                {% else %}
+                —
+                {% endif %}
+            </td>
+            <td style="padding: 4px;">
+                <form method="POST" action="{{ url_for('settings_bp.clear_electrum_pin') }}" style="display:inline; margin:0;">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="server_key" value="{{ server_key }}">
+                    <button type="submit" class="btn" style="padding: 2px 8px; font-size: 10px; background: var(--accent-red);"
+                            onclick="return confirm('Clear pin for {{ server_key }}? The cert will be re-pinned on next connection.');">✕</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <div style="margin-top: 15px;">
+        <form method="POST" action="{{ url_for('settings_bp.clear_all_electrum_pins') }}" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn" style="font-size: 11px; background: var(--accent-red);"
+                    onclick="return confirm('Clear ALL certificate pins? All server certs will be re-pinned on next connection.');">Clear All Pins</button>
+        </form>
+    </div>
+    {% else %}
+    <p style="color: #666; font-style: italic;">No servers pinned yet. Pins are created automatically on first Electrum connection.</p>
+    {% endif %}
+</div>
+
+<div class="card">
     <div class="card-title">Export Public Key</div>
     <p style="margin-bottom: 15px; color: #00ff41;">
         Export your public key for watch-only wallets or verification.
