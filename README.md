@@ -276,7 +276,7 @@ gunicorn -c gunicorn.conf.py wsgi:app
 
 ## License
 
-FUCK YOU PAY ME License - See [LICENSE](../LICENSE)
+FUCK YOU PAY ME License - See [LICENSE](LICENSE)
 
 ## Disclaimer
 
