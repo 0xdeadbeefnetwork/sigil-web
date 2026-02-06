@@ -215,10 +215,21 @@ def _parse_peer_features(features: List[str]) -> Dict[str, Any]:
     return result
 
 
+def _is_ipv6(host: str) -> bool:
+    """Check if a hostname is an IPv6 address (bare or bracketed)"""
+    stripped = host.strip("[]")
+    try:
+        socket.inet_pton(socket.AF_INET6, stripped)
+        return True
+    except (socket.error, OSError):
+        return False
+
+
 def _discover_peers(client: 'ElectrumClient') -> List[Tuple[str, int, int, Optional[str]]]:
     """
     Call server.peers.subscribe on the connected server to discover peers.
     Returns list of (host, tcp_port, ssl_port, onion) tuples.
+    IPv6-only peers are excluded (we use AF_INET sockets).
     """
     try:
         raw_peers = client._call("server.peers.subscribe")
@@ -239,6 +250,14 @@ def _discover_peers(client: 'ElectrumClient') -> List[Tuple[str, int, int, Optio
 
             if not hostname or not isinstance(features, list):
                 continue
+
+            # Skip IPv6 addresses — our sockets are AF_INET (IPv4)
+            if _is_ipv6(hostname) or _is_ipv6(_ip):
+                # If hostname is a normal FQDN but IP is IPv6, keep it —
+                # the hostname may resolve to IPv4 too. Only skip if the
+                # hostname itself is an IPv6 literal.
+                if _is_ipv6(hostname):
+                    continue
 
             # Skip if we already have this host
             if hostname in seen_hosts:
@@ -363,6 +382,10 @@ class ElectrumClient:
 
             if self.use_tor and onion:
                 host = onion
+
+            # Skip IPv6 literal hosts — we use AF_INET sockets
+            if _is_ipv6(host):
+                continue
 
             target_port = ssl_port if use_ssl else tcp_port
 
@@ -569,10 +592,10 @@ def _pin_additional_peers(client: ElectrumClient, count: int = 8):
         return
 
     pins = _load_pins()
-    # Filter to SSL peers we haven't pinned yet (skip .onion for speed)
+    # Filter to SSL peers we haven't pinned yet (skip .onion and IPv6)
     unpinned = []
     for host, tcp_port, ssl_port, onion in cached:
-        if onion or not ssl_port:
+        if onion or not ssl_port or _is_ipv6(host):
             continue
         key = f"{host}:{ssl_port}"
         if key not in pins:
