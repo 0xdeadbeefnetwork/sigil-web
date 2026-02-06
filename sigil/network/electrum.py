@@ -541,14 +541,62 @@ def get_client(network="mainnet", use_tor=False):
 
 
 def reconnect_client(network="mainnet", use_tor=False):
-    """Force a fresh connection — closes existing, reconnects, re-discovers peers"""
+    """Force a fresh connection — closes existing, reconnects, re-discovers peers, pins multiple"""
     global _client
     if _client:
         _client.close()
     _client = ElectrumClient(network=network, use_tor=use_tor)
     if not _client.connect():
         raise Exception("Failed to connect to any Electrum server")
+    # Proactively pin certs for additional peers so TOFU protects future connections
+    _pin_additional_peers(_client)
     return _client
+
+
+def _pin_additional_peers(client: ElectrumClient, count: int = 8):
+    """
+    After discovery, connect briefly to several random peers just to pin their
+    SSL certificates.  This way when the shuffle picks them later, the cert is
+    already pinned and TOFU can detect changes.
+    Only pins peers we haven't pinned yet.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+
+    net = "testnet" if client.network == "testnet" else "mainnet"
+    cached = _load_cached_peers(net)
+    if not cached:
+        return
+
+    pins = _load_pins()
+    # Filter to SSL peers we haven't pinned yet (skip .onion for speed)
+    unpinned = []
+    for host, tcp_port, ssl_port, onion in cached:
+        if onion or not ssl_port:
+            continue
+        key = f"{host}:{ssl_port}"
+        if key not in pins:
+            unpinned.append((host, ssl_port))
+
+    if not unpinned:
+        return
+
+    # Pick a random sample
+    sample = _shuffle_list(unpinned)[:count]
+    pinned = 0
+
+    for host, port in sample:
+        try:
+            sock = client._create_socket(host, port, use_ssl=True)
+            # _create_socket already called _verify_or_pin_cert — cert is pinned
+            # Just close immediately, we don't need to speak Electrum protocol
+            sock.close()
+            pinned += 1
+        except Exception:
+            continue  # Unreachable, down, or cert mismatch — skip
+
+    if pinned:
+        log.info("Pinned %d additional peer certificates", pinned)
 
 
 # Convenience functions
