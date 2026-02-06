@@ -46,8 +46,8 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     SIGIL Web Interface                       │
-│              Flask + Gunicorn (12 Blueprints)                 │
+│                     SIGIL Web Interface                      │
+│              Flask + Gunicorn (12 Blueprints)                │
 ├──────────────────────────────────────────────────────────────┤
 │   sigil.bitcoin       │   sigil.crypto    │   sigil.privacy  │
 │   Transaction build   │   BIP32/39/84     │   Tumbler        │
