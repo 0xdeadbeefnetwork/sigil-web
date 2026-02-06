@@ -87,6 +87,9 @@ def settings():
     electrum_pins = get_pinned_servers()
     electrum_peer_count = get_cached_peer_count(Config.NETWORK)
 
+    # Check if a peer refresh is in progress (set by refresh_electrum_peers)
+    peer_refresh_pending = session.pop('peer_refresh_pending', False)
+
     return render_template(
         'settings.html',
         title='Settings', active='settings', version=SIGIL_VERSION,
@@ -97,6 +100,7 @@ def settings():
         signing_pin_active=signing_pin_enabled(), factory_keys=factory_keys,
         electrum_pins=electrum_pins,
         electrum_peer_count=electrum_peer_count,
+        peer_refresh_pending=peer_refresh_pending,
         session=session
     )
 
@@ -380,5 +384,6 @@ def refresh_electrum_peers():
 
     t = threading.Thread(target=_bg_discover, daemon=True)
     t.start()
-    flash('Peer discovery started in background — refresh page in a few seconds to see results', 'success')
+    session['peer_refresh_pending'] = True
+    flash('Peer discovery running — page will auto-refresh', 'success')
     return redirect(url_for('settings_bp.settings'))

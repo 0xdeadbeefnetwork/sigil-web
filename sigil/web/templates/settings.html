@@ -274,4 +274,27 @@
     </a>
 </div>
 </div>
+{% if peer_refresh_pending %}
+<script>
+(function() {
+    var orig = {{ electrum_peer_count }};
+    var pins = {{ electrum_pins | length }};
+    var checks = 0;
+    var iv = setInterval(function() {
+        checks++;
+        if (checks >= 8) { clearInterval(iv); location.reload(); return; }
+        fetch(location.href, {credentials: 'same-origin'})
+            .then(function(r) { return r.text(); })
+            .then(function(html) {
+                var m = html.match(/DISCOVERED PEERS:<\/span>\s*<span[^>]*>(\d+)/);
+                var p = (html.match(/class="mono" style="padding: 4px; color: #00ff41;"/g) || []).length;
+                if ((m && parseInt(m[1]) !== orig) || p > pins) {
+                    clearInterval(iv);
+                    location.reload();
+                }
+            }).catch(function(){});
+    }, 3000);
+})();
+</script>
+{% endif %}
 {% endblock %}
