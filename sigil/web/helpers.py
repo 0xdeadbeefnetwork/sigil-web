@@ -88,10 +88,25 @@ def get_exit_ip():
 
 
 def get_mempool_base():
-    """Get mempool API base URL based on Tor setting"""
-    if get_tor_enabled():
+    """Get mempool explorer base URL based on how the user is accessing SIGIL.
+
+    If the user is browsing via .onion, give them .onion explorer links so
+    their browser stays on Tor.  Otherwise use clearnet links — even if the
+    *backend* routes API calls through Tor, the user's browser is on clearnet
+    and can't follow .onion links.
+    """
+    from sigil.bitcoin.config import Config
+    onion = is_onion_request()
+    testnet = Config.NETWORK == "testnet"
+
+    if onion and testnet:
+        return MEMPOOL_ONION + "/testnet4"
+    elif onion:
         return MEMPOOL_ONION
-    return "https://mempool.space"
+    elif testnet:
+        return "https://mempool.space/testnet4"
+    else:
+        return "https://mempool.space"
 
 
 # =========================================================================

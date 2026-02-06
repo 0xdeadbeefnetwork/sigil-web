@@ -80,7 +80,7 @@
     <h3 style="margin-top: 20px;">Transaction History</h3>
     <ul style="font-family: monospace; font-size: 12px;">
     {% for txid in state.txids %}
-        <li>Hop {{ loop.index }}: <a href="https://mempool.space/tx/{{ txid }}" target="_blank">{{ txid[:16] }}...</a></li>
+        <li>Hop {{ loop.index }}: <a href="{{ mempool_base }}/tx/{{ txid }}" target="_blank">{{ txid[:16] }}...</a></li>
     {% endfor %}
     </ul>
     {% endif %}
@@ -103,7 +103,7 @@
     <h3>Transaction Chain</h3>
     <ul style="font-family: monospace; font-size: 12px;">
     {% for txid in state.txids %}
-        <li>Hop {{ loop.index }}: <a href="https://mempool.space/tx/{{ txid }}" target="_blank">{{ txid[:20] }}...</a></li>
+        <li>Hop {{ loop.index }}: <a href="{{ mempool_base }}/tx/{{ txid }}" target="_blank">{{ txid[:20] }}...</a></li>
     {% endfor %}
     </ul>
 

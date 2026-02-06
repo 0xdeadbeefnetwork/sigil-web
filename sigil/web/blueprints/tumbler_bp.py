@@ -23,7 +23,7 @@ from sigil.privacy.tumbler import (
     generate_job_id, start_tumbler_monitor, stop_tumbler_monitor,
     cleanup_tumble_slots
 )
-from sigil.web.helpers import SIGIL_VERSION, login_required
+from sigil.web.helpers import SIGIL_VERSION, login_required, get_mempool_base
 from sigil.web.security import csrf_required
 from sigil.web.session_mgmt import se050_session
 
@@ -37,7 +37,7 @@ def tumbler():
     return render_template(
         'tumbler.html',
         title='Tumbler', active='tumbler', version=SIGIL_VERSION,
-        state=state, session=session
+        state=state, session=session, mempool_base=get_mempool_base()
     )
 
 
