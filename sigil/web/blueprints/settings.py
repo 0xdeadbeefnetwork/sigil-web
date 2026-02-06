@@ -27,7 +27,7 @@ from sigil.web.helpers import (
 )
 from sigil.web.security import csrf_required
 from sigil.web.session_mgmt import se050_session
-from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins, get_cached_peer_count, get_client
+from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins, get_cached_peer_count, get_client, reconnect_client
 
 settings_bp = Blueprint('settings_bp', __name__)
 
@@ -374,8 +374,7 @@ def refresh_electrum_peers():
     def _bg_discover():
         try:
             use_tor = Config.TOR_ENABLED if hasattr(Config, 'TOR_ENABLED') else False
-            client = get_client(network=Config.NETWORK, use_tor=use_tor)
-            # get_client() already triggers _discover_and_cache_peers on connect
+            reconnect_client(network=Config.NETWORK, use_tor=use_tor)
         except Exception:
             pass
 

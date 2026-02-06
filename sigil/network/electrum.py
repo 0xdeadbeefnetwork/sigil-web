@@ -540,6 +540,17 @@ def get_client(network="mainnet", use_tor=False):
     return _client
 
 
+def reconnect_client(network="mainnet", use_tor=False):
+    """Force a fresh connection — closes existing, reconnects, re-discovers peers"""
+    global _client
+    if _client:
+        _client.close()
+    _client = ElectrumClient(network=network, use_tor=use_tor)
+    if not _client.connect():
+        raise Exception("Failed to connect to any Electrum server")
+    return _client
+
+
 # Convenience functions
 def electrum_get_utxos(address, network="mainnet", use_tor=False):
     client = get_client(network, use_tor)
