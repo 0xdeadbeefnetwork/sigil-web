@@ -27,7 +27,7 @@ from sigil.web.helpers import (
 )
 from sigil.web.security import csrf_required
 from sigil.web.session_mgmt import se050_session
-from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins, get_cached_peer_count
+from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins, get_cached_peer_count, get_client
 
 settings_bp = Blueprint('settings_bp', __name__)
 
@@ -361,4 +361,19 @@ def clear_all_electrum_pins():
     """Clear all Electrum server certificate pins"""
     clear_all_pins()
     flash('All Electrum certificate pins cleared. Certs will be re-pinned on next connection.', 'success')
+    return redirect(url_for('settings_bp.settings'))
+
+
+@settings_bp.route('/settings/refresh-peers', methods=['POST'])
+@login_required
+@csrf_required
+def refresh_electrum_peers():
+    """Manually trigger Electrum peer discovery"""
+    try:
+        use_tor = Config.TOR_ENABLED if hasattr(Config, 'TOR_ENABLED') else False
+        client = get_client(network=Config.NETWORK, use_tor=use_tor)
+        peer_count = get_cached_peer_count(Config.NETWORK)
+        flash(f'Peer discovery complete — {peer_count} peers found', 'success')
+    except Exception as e:
+        flash(f'Peer discovery failed: {e}', 'error')
     return redirect(url_for('settings_bp.settings'))

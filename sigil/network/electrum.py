@@ -397,8 +397,10 @@ class ElectrumClient:
             peers = _discover_peers(self)
             if peers:
                 _save_cached_peers(net, peers)
-        except Exception:
-            pass  # Non-fatal — we're already connected, peer discovery is best-effort
+        except Exception as e:
+            # Non-fatal — we're already connected, peer discovery is best-effort
+            import logging
+            logging.getLogger(__name__).warning("Peer discovery failed: %s", e)
 
     def close(self):
         """Close connection"""
