@@ -4,6 +4,11 @@
 # ==========================
 # Installs SIGIL Bitcoin Hardware Wallet on Raspberry Pi
 #
+# Usage:
+#   sudo ./install.sh                    # Full install (Tor from apt)
+#   sudo ./install.sh --tor-source       # Full install (compile Tor from source)
+#   sudo ./install.sh --regen-onion      # Regenerate .onion address only
+#
 
 set -e
 
@@ -12,6 +17,29 @@ GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
 CYAN="\033[0;36m"
 NC="\033[0m"
+
+# Parse flags
+TOR_FROM_SOURCE=false
+REGEN_ONION=false
+for arg in "$@"; do
+    case "$arg" in
+        --tor-source)  TOR_FROM_SOURCE=true ;;
+        --regen-onion) REGEN_ONION=true ;;
+        --help|-h)
+            echo "Usage: sudo ./install.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --tor-source     Compile and install current stable Tor from source"
+            echo "  --regen-onion    Regenerate .onion address (run on existing install)"
+            echo "  --help           Show this help"
+            echo ""
+            echo "Environment:"
+            echo "  SIGIL_USER=user          Run as this user"
+            echo "  SIGIL_INSTALL_DIR=/path  Install to this directory"
+            exit 0
+            ;;
+    esac
+done
 
 # Configurable paths
 INSTALL_DIR="${SIGIL_INSTALL_DIR:-/opt/sigil}"
@@ -49,6 +77,56 @@ check_root() {
     fi
 }
 
+regen_onion() {
+    log_info "Regenerating .onion address..."
+
+    # Save old address for reference
+    OLD_ONION=""
+    if [ -f /var/lib/tor/sigil-web/hostname ]; then
+        OLD_ONION=$(cat /var/lib/tor/sigil-web/hostname)
+        echo -e "  Old address: ${RED}${OLD_ONION}${NC}"
+    fi
+
+    # Stop Tor, nuke the hidden service directory, restart
+    systemctl stop tor
+    rm -rf /var/lib/tor/sigil-web
+
+    # Ensure torrc still has our config
+    if ! grep -q "sigil-web" /etc/tor/torrc 2>/dev/null; then
+        cat >> /etc/tor/torrc << TOREOF
+
+# SIGIL Hardware Wallet
+HiddenServiceDir /var/lib/tor/sigil-web/
+HiddenServicePort 80 127.0.0.1:5000
+TOREOF
+    fi
+
+    systemctl start tor
+
+    # Wait for new hostname generation
+    log_info "Waiting for Tor to generate new keypair..."
+    for i in $(seq 1 20); do
+        [ -f /var/lib/tor/sigil-web/hostname ] && break
+        sleep 2
+    done
+    sleep 2
+
+    if [ -f /var/lib/tor/sigil-web/hostname ]; then
+        NEW_ONION=$(cat /var/lib/tor/sigil-web/hostname)
+        echo ""
+        echo -e "${GREEN}New .onion address:${NC}"
+        echo -e "  ${YELLOW}${NEW_ONION}${NC}"
+        echo ""
+        if [ -n "$OLD_ONION" ]; then
+            log_warn "Old address is now dead. Update any bookmarks."
+        fi
+    else
+        log_error "Tor failed to generate new address. Check: journalctl -u tor"
+    fi
+
+    exit 0
+}
+
 confirm_settings() {
     echo ""
     echo -e "${CYAN}Installation Settings:${NC}"
@@ -75,21 +153,120 @@ confirm_settings() {
     fi
 }
 
+install_tor_from_source() {
+    log_info "Compiling Tor from source (current stable)..."
+
+    # Build dependencies
+    apt-get install -y -qq \
+        automake autoconf libtool \
+        libevent-dev libssl-dev zlib1g-dev \
+        asciidoc > /dev/null
+
+    TOR_BUILD_DIR=$(mktemp -d)
+    cd "${TOR_BUILD_DIR}"
+
+    # Fetch latest stable release version from Tor Project
+    log_info "Fetching latest stable Tor release..."
+    TOR_VERSION=$(curl -sL https://dist.torproject.org/ \
+        | grep -oP 'tor-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' \
+        | sort -V | tail -1 | sed 's/\.tar\.gz//' | sed 's/tor-//')
+
+    if [ -z "$TOR_VERSION" ]; then
+        log_error "Could not determine latest Tor version"
+        log_warn "Falling back to apt package..."
+        apt-get install -y -qq tor > /dev/null
+        return
+    fi
+
+    log_info "Building Tor ${TOR_VERSION}..."
+    curl -sLO "https://dist.torproject.org/tor-${TOR_VERSION}.tar.gz"
+    curl -sLO "https://dist.torproject.org/tor-${TOR_VERSION}.tar.gz.sha256sum"
+
+    # Verify checksum
+    if ! sha256sum -c "tor-${TOR_VERSION}.tar.gz.sha256sum" 2>/dev/null; then
+        log_error "Tor source checksum verification FAILED"
+        rm -rf "${TOR_BUILD_DIR}"
+        exit 1
+    fi
+    log_info "Checksum verified"
+
+    tar xzf "tor-${TOR_VERSION}.tar.gz"
+    cd "tor-${TOR_VERSION}"
+
+    ./configure --disable-asciidoc > /dev/null 2>&1
+    make -j$(nproc) > /dev/null 2>&1
+    make install > /dev/null 2>&1
+
+    log_info "Tor ${TOR_VERSION} installed to /usr/local/bin/tor"
+
+    # Clean up build dir
+    rm -rf "${TOR_BUILD_DIR}"
+
+    # Create tor user if it doesn't exist
+    id -u debian-tor > /dev/null 2>&1 || useradd --system --no-create-home --group debian-tor debian-tor 2>/dev/null || true
+
+    # Create data directory
+    mkdir -p /var/lib/tor
+    chown debian-tor:debian-tor /var/lib/tor
+    chmod 700 /var/lib/tor
+
+    # Create systemd service for source-built Tor
+    if [ ! -f /etc/systemd/system/tor.service ] || grep -q "/usr/bin/tor" /etc/systemd/system/tor.service 2>/dev/null; then
+        cat > /etc/systemd/system/tor.service << TORSVCEOF
+[Unit]
+Description=Tor Anonymizing Overlay Network
+After=network.target
+
+[Service]
+Type=simple
+User=debian-tor
+ExecStart=/usr/local/bin/tor -f /etc/tor/torrc
+ExecReload=/bin/kill -HUP \$MAINPID
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+TORSVCEOF
+        systemctl daemon-reload
+    fi
+
+    # Ensure torrc exists
+    mkdir -p /etc/tor
+    [ -f /etc/tor/torrc ] || touch /etc/tor/torrc
+    chown debian-tor:debian-tor /etc/tor/torrc
+}
+
 install_dependencies() {
     log_info "Updating package lists..."
     apt-get update -qq
-    
+
     log_info "Installing system packages..."
-    apt-get install -y -qq \
-        python3 \
-        python3-pip \
-        tor \
-        i2c-tools \
-        build-essential \
-        libffi-dev \
-        libssl-dev \
-        > /dev/null
-    
+    if [ "$TOR_FROM_SOURCE" = true ]; then
+        # Install everything except Tor from apt
+        apt-get install -y -qq \
+            python3 \
+            python3-pip \
+            i2c-tools \
+            build-essential \
+            libffi-dev \
+            libssl-dev \
+            curl \
+            > /dev/null
+        install_tor_from_source
+    else
+        apt-get install -y -qq \
+            python3 \
+            python3-pip \
+            tor \
+            i2c-tools \
+            build-essential \
+            libffi-dev \
+            libssl-dev \
+            > /dev/null
+    fi
+
     log_info "Installing Python packages..."
     pip3 install --break-system-packages -q \
         flask \
@@ -375,8 +552,12 @@ print_success() {
     echo "  sudo systemctl status sigil    # Check status"
     echo "  sudo systemctl restart sigil   # Restart"
     echo "  journalctl -u sigil -f         # View logs"
+    echo "  sudo ./install.sh --regen-onion  # New .onion address"
     echo ""
-    
+    echo -e "${CYAN}Support SIGIL development:${NC}"
+    echo -e "  ${YELLOW}bc1qtt02xk5qwgt9qsrz9gwuksqejrh7z5d2e6ny3k${NC}"
+    echo ""
+
     if [ -f /tmp/sigil_needs_reboot ]; then
         echo -e "${YELLOW}>>> REBOOT REQUIRED for I2C <<<${NC}"
         echo ""
@@ -394,6 +575,12 @@ print_success() {
 
 print_banner
 check_root
+
+# Handle --regen-onion: standalone operation on existing install
+if [ "$REGEN_ONION" = true ]; then
+    regen_onion
+fi
+
 confirm_settings
 
 log_info "Starting installation..."
