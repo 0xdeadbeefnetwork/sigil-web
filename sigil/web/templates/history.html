@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2 style="margin-bottom: 20px;">Transaction History</h2>
+
+    <div class="card">
+        {% if transactions %}
+        <div class="table-responsive">
+        <table>
+            <tr>
+                <th>TXID</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Fee</th>
+                <th>Status</th>
+                <th>Time</th>
+            </tr>
+            {% for tx in transactions %}
+            <tr>
+                <td class="mono">
+                    <a href="{{ mempool_base }}/tx/{{ tx.txid }}" target="_blank"
+                       style="color: var(--accent-blue); text-decoration: none;">
+                        {{ tx.txid[:12] }}...
+                    </a>
+                </td>
+                <td>
+                    {% if tx.received > tx.sent %}
+                    <span class="text-success">↓ Receive</span>
+                    {% else %}
+                    <span class="text-danger">↑ Send</span>
+                    {% endif %}
+                </td>
+                <td class="{% if tx.received > tx.sent %}text-success{% else %}text-danger{% endif %}">
+                    {{ "{:+,}".format(tx.net) }} sats
+                </td>
+                <td class="text-dim">{{ "{:,}".format(tx.fee or 0) }}</td>
+                <td>
+                    {% if tx.confirmed %}
+                    <span class="status status-success">{{ tx.confirmations }} conf</span>
+                    {% else %}
+                    <span class="status status-pending">Pending</span>
+                    {% endif %}
+                </td>
+                <td class="text-dim">{{ tx.time }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        </div>
+        {% else %}
+        <p class="text-dim" style="padding: 20px; text-align: center;">No transactions yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

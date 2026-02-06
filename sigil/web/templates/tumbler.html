@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2>Self-Tumbler</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+        Break the transaction graph. Send coins to the tumble address,
+        they'll hop through temporary wallets and arrive in your main wallet.
+    </p>
+
+    {% if state.status == 'idle' %}
+    <form method="POST" action="{{ url_for('tumbler_bp.tumbler_start') }}" data-loading="Generating keys...">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label>Delay Between Hops</label>
+            <select name="delay_preset" class="form-control">
+                <option value="fast">Fast (1-5 minutes)</option>
+                <option value="normal" selected>Normal (10-30 minutes)</option>
+                <option value="stealth">Stealth (1-6 hours)</option>
+                <option value="paranoid">Paranoid (6-24 hours)</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Generate Tumble Address</button>
+    </form>
+
+    {% elif state.status == 'waiting_deposit' %}
+    <div class="alert alert-info">
+        <strong>Waiting for deposit...</strong><br>
+        Send coins to the address below. Once confirmed, tumbling will begin automatically.
+    </div>
+
+    <div class="form-group">
+        <label>Tumble Deposit Address</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" class="form-control" value="{{ state.deposit_address }}" readonly
+                   style="font-family: monospace; font-size: 14px;">
+            <button onclick="copyToClipboard('{{ state.deposit_address }}', this)"
+                    class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin: 20px 0;">
+        <div class="qr-container">
+            <img src="{{ url_for('tumbler_bp.tumbler_qr') }}" alt="QR Code" style="max-width: 200px; image-rendering: pixelated;">
+        </div>
+    </div>
+
+    <p style="color: var(--text-secondary);">
+        <strong>Delay preset:</strong> {{ state.delay_preset }}<br>
+        <strong>Hop slots:</strong> {{ state.hop_slots|length }} temporary wallets ready
+    </p>
+
+    <form method="POST" action="{{ url_for('tumbler_bp.tumbler_cancel') }}" style="margin-top: 20px;">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger">Cancel & Cleanup</button>
+    </form>
+
+    {% elif state.status == 'tumbling' %}
+    <div class="alert alert-warning">
+        <strong>Tumbling in progress...</strong>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-item">
+            <span class="info-label">Amount</span>
+            <span class="info-value">{{ "{:,}".format(state.amount_sats) }} sats</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Current Hop</span>
+            <span class="info-value">{{ state.current_hop + 1 }} / {{ state.hop_slots|length + 1 }}</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Next Hop</span>
+            <span class="info-value">{{ state.next_hop_time[:19] if state.next_hop_time else 'Processing...' }}</span>
+        </div>
+    </div>
+
+    {% if state.txids %}
+    <h3 style="margin-top: 20px;">Transaction History</h3>
+    <ul style="font-family: monospace; font-size: 12px;">
+    {% for txid in state.txids %}
+        <li>Hop {{ loop.index }}: <a href="https://mempool.space/tx/{{ txid }}" target="_blank">{{ txid[:16] }}...</a></li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('tumbler_bp.tumbler_cancel') }}" style="margin-top: 20px;"
+          data-loading="Cancelling...">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger"
+                onclick="return confirm('Cancel tumble and delete all temporary key slots? Any coins mid-hop will be lost!')">
+            Cancel Tumble & Delete Slots
+        </button>
+    </form>
+
+    {% elif state.status == 'complete' %}
+    <div class="alert alert-success">
+        <strong>Tumble Complete!</strong><br>
+        {{ "{:,}".format(state.amount_sats) }} sats delivered to your main wallet.
+    </div>
+
+    <h3>Transaction Chain</h3>
+    <ul style="font-family: monospace; font-size: 12px;">
+    {% for txid in state.txids %}
+        <li>Hop {{ loop.index }}: <a href="https://mempool.space/tx/{{ txid }}" target="_blank">{{ txid[:20] }}...</a></li>
+    {% endfor %}
+    </ul>
+
+    <form method="POST" action="{{ url_for('tumbler_bp.tumbler_cleanup') }}" style="margin-top: 20px;">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary">Cleanup & Start New Tumble</button>
+    </form>
+
+    {% elif state.status == 'failed' %}
+    <div class="alert alert-danger">
+        <strong>Tumble Failed</strong><br>
+        {{ state.error }}
+    </div>
+
+    <form method="POST" action="{{ url_for('tumbler_bp.tumbler_cancel') }}" style="margin-top: 20px;">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-danger">Cleanup & Reset</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

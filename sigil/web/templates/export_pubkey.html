@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2>Public Key Export</h2>
+
+    <div class="card">
+        <div class="card-title">Compressed Public Key (33 bytes)</div>
+        <div style="font-family: monospace; word-break: break-all; font-size: 13px; padding: 10px; background: #0d0d15; border-radius: 4px;">{{ pubkey_hex }}</div>
+        <button class="btn btn-secondary" style="margin-top: 10px;" onclick="copyToClipboard('{{ pubkey_hex }}', this)">Copy</button>
+    </div>
+
+    {% if addresses %}
+    <div class="card">
+        <div class="card-title">Derived Addresses</div>
+        {% for type, addr in addresses.items() %}
+        <div style="margin: 12px 0;">
+            <strong style="color: var(--accent-green);">{{ type }}:</strong><br>
+            <span style="font-family: monospace; word-break: break-all; font-size: 13px;">{{ addr }}</span>
+            <button class="btn btn-secondary" style="margin-left: 8px; padding: 4px 10px; font-size: 12px;" onclick="copyToClipboard('{{ addr }}', this)">Copy</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <p style="margin-top: 20px;">
+        <a href="{{ url_for('settings_bp.settings') }}">← Back to Settings</a>
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2 style="margin-bottom: 20px;">Sign Message</h2>
+
+    <div class="grid grid-2">
+        <div class="card">
+            <form method="POST" data-loading="Signing with SE050...">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea name="message" class="form-control" rows="5"
+                              placeholder="Enter message to sign..." required></textarea>
+                </div>
+                {% if pin_required %}
+                <div class="form-group">
+                    <label>Signing PIN</label>
+                    <input type="password" name="signing_pin" class="form-control"
+                           placeholder="Enter signing PIN to authorize" required>
+                </div>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Sign with SE050</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-title">About Message Signing</div>
+            <p class="text-dim">
+                Message signing proves you control an address without spending any Bitcoin.
+                The signature is created on your SE050 hardware - the private key never leaves the chip.
+            </p>
+            <p class="text-dim" style="margin-top: 15px;">
+                Use cases:
+            </p>
+            <ul class="text-dim" style="margin-left: 20px;">
+                <li>Prove ownership of an address</li>
+                <li>Sign contracts or agreements</li>
+                <li>Verify identity</li>
+            </ul>
+        </div>
+    </div>
+
+    {% if signature %}
+    <div class="card">
+        <div class="card-title">Signature Result</div>
+        <div class="table-responsive">
+        <table>
+            <tr>
+                <td style="width: 100px;">Address</td>
+                <td class="mono">{{ address }}</td>
+            </tr>
+            <tr>
+                <td>Message</td>
+                <td>{{ message }}</td>
+            </tr>
+            <tr>
+                <td>Signature</td>
+                <td class="mono" style="word-break: break-all;">{{ signature }}</td>
+            </tr>
+        </table>
+        </div>
+        <button class="copy-btn" style="margin-top: 15px;"
+                onclick="copyToClipboard('{{ signature }}', this)">Copy Signature</button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2>Verify Signed Message</h2>
+
+    {% if result is not none %}
+    <div class="alert {% if result %}alert-success{% else %}alert-error{% endif %}">
+        {% if result %}
+        <strong>✓ Signature Valid!</strong> Message was signed by this address.
+        {% else %}
+        <strong>✗ Signature Invalid!</strong> Message was NOT signed by this address.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label>Bitcoin Address</label>
+            <input type="text" name="address" class="form-control"
+                   value="{{ address }}" placeholder="bc1q..." style="font-family: monospace;">
+        </div>
+
+        <div class="form-group">
+            <label>Signature (base64)</label>
+            <input type="text" name="signature" class="form-control"
+                   value="{{ signature }}" style="font-family: monospace;">
+        </div>
+
+        <div class="form-group">
+            <label>Message</label>
+            <textarea name="message" class="form-control" rows="10"
+                      style="font-family: monospace;">{{ message }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Verify Signature</button>
+    </form>
+
+    <p style="margin-top: 20px;">
+        <a href="{{ url_for('privacy_bp.canary') }}">← Back to Canary</a>
+    </p>
+</div>
+{% endblock %}

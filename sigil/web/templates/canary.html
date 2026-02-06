@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2>Warrant Canary</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+        Cryptographically signed proof you haven't been compromised.
+        Publish regularly. If you stop updating, people know something's wrong.
+    </p>
+
+    {% if canary %}
+    <div class="alert {% if canary.is_expired() %}alert-danger{% elif canary.days_until_expiry() < 7 %}alert-warning{% else %}alert-success{% endif %}">
+        {% if canary.is_expired() %}
+        <strong>CANARY EXPIRED!</strong> - Update immediately or assume compromise.
+        {% elif canary.days_until_expiry() < 7 %}
+        <strong>Expires in {{ canary.days_until_expiry() }} days</strong> - Consider renewing.
+        {% else %}
+        <strong>Active</strong> - Expires in {{ canary.days_until_expiry() }} days (Sequence #{{ canary.sequence }})
+        {% endif %}
+    </div>
+
+    <div class="form-group">
+        <label>Current Canary</label>
+        <textarea class="form-control" rows="15" readonly style="font-family: monospace; font-size: 12px;">{{ canary_text }}</textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button onclick="copyToClipboard(document.querySelector('textarea[readonly]').value, this)"
+                class="btn btn-secondary">Copy to Clipboard</button>
+        <a href="{{ url_for('privacy_bp.canary_verify') }}" class="btn btn-secondary">Verify in SIGIL</a>
+        <a href="https://www.verifybitcoinmessage.com/" target="_blank" class="btn btn-secondary">Verify Online</a>
+    </div>
+
+    <div style="margin-top: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 4px;">
+        <strong>How to Verify:</strong>
+        <ol style="margin: 10px 0 0 20px; color: var(--text-secondary);">
+            <li>Copy the canary text above</li>
+            <li>Go to verifybitcoinmessage.com or use Electrum (Tools → Verify Signature)</li>
+            <li>Paste: Address, Signature (base64), and Message</li>
+            <li>Should show "Message verified"</li>
+        </ol>
+        <p style="margin-top: 10px; font-size: 12px; color: var(--text-secondary);">
+            <strong>Address:</strong> <code>{{ canary.address }}</code><br>
+            <strong>Signature:</strong> <code style="word-break: break-all;">{{ canary.signature }}</code>
+        </p>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No canary generated yet. Create one to prove you haven't been compromised.
+    </div>
+    {% endif %}
+
+    <h3 style="margin-top: 30px;">Generate New Canary</h3>
+    <form method="POST" action="{{ url_for('privacy_bp.canary_create') }}" data-loading="Signing...">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label>Validity Period</label>
+            <select name="validity_days" class="form-control">
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30" selected>30 days</option>
+                <option value="90">90 days</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Custom Message (optional)</label>
+            <textarea name="custom_text" class="form-control" rows="3"
+                      placeholder="Add any personal statement..."></textarea>
+        </div>
+
+        {% if pin_required %}
+        <div class="form-group">
+            <label>Signing PIN</label>
+            <input type="password" name="signing_pin" class="form-control" required>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">Sign & Generate Canary</button>
+    </form>
+</div>
+{% endblock %}

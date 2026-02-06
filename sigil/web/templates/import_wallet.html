@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2 style="margin-bottom: 20px;">Import Wallet</h2>
+
+    <div class="card">
+        <div class="card-title">Enter Seed Phrase</div>
+        <p style="margin-bottom: 15px; color: #00ff41;">
+            Enter your 12 or 24 word seed phrase to restore your wallet.
+        </p>
+        <form method="POST" data-loading="Importing to SE050...">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label>Seed Phrase</label>
+                <textarea name="mnemonic" class="form-control" rows="6" required
+                          placeholder="Enter your seed words separated by spaces..."
+                          style="min-height: 120px; resize: vertical;"></textarea>
+                <p style="color: #666; font-size: 11px; margin-top: 5px;">Typically 12 or 24 words, separated by spaces.</p>
+            </div>
+            {% if pin_required %}
+            <div class="form-group">
+                <label style="color: #ffff00;">Signing PIN Required</label>
+                <input type="password" name="signing_pin" class="form-control"
+                       placeholder="Enter signing PIN to authorize" required>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Import Wallet</button>
+        </form>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger" style="margin-top: 20px;">
+        <strong>Import Failed:</strong> {{ error }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

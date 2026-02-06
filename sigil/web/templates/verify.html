@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+<h2 style="margin-bottom: 20px; color: #00ffff;">// SE050 CONTROL</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-title">// Status</div>
+        <table>
+            <tr>
+                <td>Connection</td>
+                <td>{% if connected %}<span class="status status-success">ONLINE</span>{% else %}<span class="status status-error">OFFLINE</span>{% endif %}</td>
+            </tr>
+            <tr><td>UID</td><td class="mono">{{ uid }}</td></tr>
+            {% if random_bytes %}<tr><td>TRNG</td><td class="mono" style="font-size: 10px;">{{ random_bytes }}</td></tr>{% endif %}
+        </table>
+    </div>
+    <div class="card">
+        <div class="card-title">// Active Slot #{{ current_slot_num }}</div>
+        <table>
+            <tr><td>Slot ID</td><td class="mono">0x{{ key_slot }}</td></tr>
+            <tr>
+                <td>Key</td>
+                <td>{% if key_exists %}<span class="status status-success">PRESENT</span>{% else %}<span class="status status-warning">EMPTY</span>{% endif %}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">// Select Slot</div>
+    <p style="color: #66cc66; margin-bottom: 10px; font-size: 12px;">
+        <span style="color: #ffff00;">&#9632;</span> Has Key &nbsp;
+        <span style="color: #ff0040;">&#9632;</span> Locked &nbsp;
+        <span style="color: #00ff41;">&#9632;</span> Current
+    </p>
+    <div class="slot-grid">
+        {% for slot in slots %}
+        <div class="slot-card {{ slot.status_class }}{% if slot.hex_id == key_slot %} slot-current{% endif %}"
+             {% if slot.can_select and slot.hex_id != key_slot %}onclick="selectSlot('{{ slot.hex_id }}')"{% endif %}>
+            <div class="slot-num">#{{ slot.num }}</div>
+            <div class="slot-status {{ slot.status_class }}">{{ slot.status_label }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    <form id="slot-form" method="POST" action="{{ url_for('wallet_mgmt_bp.change_key_slot') }}" style="display:none;">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="key_slot" id="slot-input">
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-title">// Wallet Operations</div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{{ url_for('wallet_mgmt_bp.create_wallet') }}">
+            <button type="button" class="btn" style="background: #00ff41; color: #000;">[ NEW WALLET ]</button>
+        </a>
+        <a href="{{ url_for('wallet_mgmt_bp.import_wallet') }}">
+            <button type="button" class="btn" style="background: #00d4ff; color: #000;">[ IMPORT SEED ]</button>
+        </a>
+        <form method="POST" action="{{ url_for('wallet_mgmt_bp.check_slot') }}" style="display: inline;">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn">[ CHECK SLOT ]</button>
+        </form>
+    </div>
+</div>
+
+{% if pubkey %}
+<div class="card">
+    <div class="card-title">// Public Key</div>
+    <p class="mono" style="word-break: break-all; font-size: 11px;">{{ pubkey }}</p>
+    <button class="btn" style="margin-top: 10px;" onclick="copyToClipboard('{{ pubkey }}', this)">[ COPY ]</button>
+</div>
+{% endif %}
+
+<script>function selectSlot(h){document.getElementById('slot-input').value=h;document.getElementById('slot-form').submit();}</script>
+</div>
+{% endblock %}

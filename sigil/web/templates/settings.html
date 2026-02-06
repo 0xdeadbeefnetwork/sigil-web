@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+<div style="text-align: center; margin-bottom: 30px; font-family: monospace; font-size: 9px; color: #00ff41; text-shadow: 0 0 10px #00ff4166; white-space: pre; line-height: 1.1; overflow-x: auto;">
+███████╗██╗ ██████╗ ██╗██╗
+██╔════╝██║██╔════╝ ██║██║
+███████╗██║██║  ███╗██║██║
+╚════██║██║██║   ██║██║██║
+███████║██║╚██████╔╝██║███████╗
+╚══════╝╚═╝ ╚═════╝ ╚═╝╚══════╝
+</div>
+<h2 style="margin-bottom: 20px; color: #00ffff;">// SYSTEM CONFIG</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-title">SE050 Key Slot</div>
+        <form method="POST" action="{{ url_for('wallet_mgmt_bp.change_key_slot') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <table>
+                <tr>
+                    <td>UID</td>
+                    <td class="mono">{{ uid }}</td>
+                </tr>
+                <tr>
+                    <td>Active Slot</td>
+                    <td>
+                        <select name="key_slot" class="form-control" style="width: auto; display: inline-block;">
+                            {% for i in range(1, 17) %}
+                            {% set slot_hex = '%08X'|format(0x20000000 + i) %}
+                            <option value="{{ slot_hex }}" {% if slot_hex == key_slot %}selected{% endif %}
+                                {% if slot_hex in locked_slots %}disabled{% endif %}>
+                                #{{ i }}{% if slot_hex in locked_slots %} (locked){% elif slot_hex in slots_with_keys %} ★{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn" style="margin-left: 10px;">Switch</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Key Status</td>
+                    <td>
+                        {% if key_exists %}
+                        <span class="status status-success">Present</span>
+                        {% else %}
+                        <span class="status status-error">Not Found</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </form>
+        <p style="color: #666; font-size: 11px; margin-top: 10px;">
+            ★ = has key | <a href="{{ url_for('wallet_mgmt_bp.verify_se050') }}" style="color: #00ffff;">Advanced slot management →</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <div class="card-title">// Network Config</div>
+        <form method="POST" action="{{ url_for('settings_bp.save_network_settings') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label>Network</label>
+                <select name="network" class="form-control">
+                    <option value="mainnet" {% if network == 'mainnet' %}selected{% endif %}>Mainnet</option>
+                    <option value="testnet" {% if network == 'testnet' %}selected{% endif %}>Testnet</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Bitcoin RPC (optional)</label>
+                <input type="text" name="rpc_url" class="form-control"
+                       placeholder="http://user:pass@127.0.0.1:8332" value="{{ rpc_url }}">
+            </div>
+            <div class="form-group" style="margin-top: 15px; padding: 15px; border: 1px solid #ff00ff44; background: #ff00ff11;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: #ff00ff;">
+                    <input type="checkbox" name="use_tor" {% if use_tor %}checked{% endif %}
+                           style="width: 18px; height: 18px; accent-color: #ff00ff;">
+                    <span style="font-size: 18px;">🧅</span>
+                    <span>ROUTE THROUGH TOR</span>
+                </label>
+                <p style="color: #999; font-size: 11px; margin-top: 8px;">
+                    Hide your IP from blockchain explorers. Requires Tor service running on port 9050.
+                </p>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label style="color: #00ffff; font-size: 12px;">API BACKEND</label>
+                <select name="api_backend" class="form-control" style="margin-top: 8px;">
+                    <option value="electrum" {% if api_backend == 'electrum' %}selected{% endif %}>Electrum (decentralized)</option>
+                    <option value="mempool" {% if api_backend == 'mempool' %}selected{% endif %}>Mempool.space API</option>
+                </select>
+                <p style="color: #999; font-size: 11px; margin-top: 8px;">
+                    Electrum connects to decentralized servers. More private, works well over Tor.
+                </p>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 15px;">[ SAVE ]</button>
+        </form>
+
+        {% if exit_ip %}
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #00ff4144;">
+            <div style="color: #666; font-size: 11px; margin-bottom: 5px;">EXIT IP:</div>
+            <div class="exit-ip-box">{{ exit_ip }}</div>
+            {% if is_tor %}<span style="color: #ff00ff; margin-left: 10px;">✓ Tor verified</span>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Export Public Key</div>
+    <p style="margin-bottom: 15px; color: #00ff41;">
+        Export your public key for watch-only wallets or verification.
+    </p>
+    <a href="{{ url_for('wallet_mgmt_bp.export_pubkey') }}" class="btn" style="background: var(--accent-green);">Export Public Key</a>
+</div>
+
+<div class="card">
+    <div class="card-title">Change Password</div>
+    <form method="POST" action="{{ url_for('settings_bp.change_password') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label>Current Password</label>
+            <input type="password" name="current" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label>New Password</label>
+            <input type="password" name="new_password" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label>Confirm New Password</label>
+            <input type="password" name="confirm" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Password</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-title">Wallet Management</div>
+    <p style="margin-bottom: 15px; color: #00ff41;">
+        Create a new wallet or import from seed phrase.
+    </p>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{{ url_for('wallet_mgmt_bp.create_wallet') }}" class="btn btn-primary">Create New Wallet</a>
+        <a href="{{ url_for('wallet_mgmt_bp.import_wallet') }}" class="btn" style="background: var(--accent-blue);">Import from Seed</a>
+        <a href="{{ url_for('wallet_mgmt_bp.verify_se050') }}" class="btn" style="background: var(--accent-purple);">Verify SE050</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Signing PIN (2FA)</div>
+    <p style="margin-bottom: 15px; color: #00ff41;">
+        {% if signing_pin_active %}
+        Signing PIN is <span class="status status-success">ENABLED</span>. A PIN is required to authorize transactions and message signing.
+        {% else %}
+        Signing PIN is <span class="status status-error">DISABLED</span>. Set a PIN to add an extra layer of protection for signing operations.
+        {% endif %}
+    </p>
+    <form method="POST" action="{{ url_for('settings_bp.set_signing_pin_route') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        {% if signing_pin_active %}
+        <div class="form-group">
+            <label>Current Signing PIN</label>
+            <input type="password" name="current_pin" class="form-control" required>
+        </div>
+        {% endif %}
+        <div class="form-group">
+            <label>New Signing PIN (leave blank to disable)</label>
+            <input type="password" name="new_pin" class="form-control" placeholder="Min 4 characters">
+        </div>
+        <div class="form-group">
+            <label>Confirm New PIN</label>
+            <input type="password" name="confirm_pin" class="form-control">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            {% if signing_pin_active %}Update Signing PIN{% else %}Enable Signing PIN{% endif %}
+        </button>
+    </form>
+</div>
+
+<div class="card" style="border: 1px solid {% if factory_keys %}var(--accent-red){% else %}var(--accent){% endif %};">
+    <div class="card-title">SCP03 Key Security</div>
+    {% if factory_keys %}
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <span style="font-size: 20px;">&#9888;</span>
+        <span style="color: var(--accent-red); font-weight: bold;">FACTORY KEYS — INSECURE</span>
+    </div>
+    <p style="color: var(--text-secondary); margin-bottom: 15px;">
+        Your SE050 is using publicly known NXP factory keys. Rotate immediately to prevent
+        man-in-the-middle attacks on the secure element communication channel.
+    </p>
+    <a href="{{ url_for('settings_bp.rotate_keys') }}" class="btn btn-danger">Rotate SCP03 Keys</a>
+    {% else %}
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <span style="font-size: 20px; color: var(--accent);">&#10003;</span>
+        <span style="color: var(--accent); font-weight: bold;">Custom keys active</span>
+    </div>
+    <p style="color: var(--text-secondary); margin-bottom: 15px;">
+        SCP03 keys have been rotated from factory defaults.
+    </p>
+    <a href="{{ url_for('settings_bp.rotate_keys') }}" class="btn">Rotate Again</a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-title">Danger Zone</div>
+    <p style="margin-bottom: 15px; color: #00ff41;">
+        These actions are irreversible. Make sure you have backups.
+    </p>
+    <a href="{{ url_for('wallet_mgmt_bp.wipe_key') }}" class="btn btn-danger"
+       onclick="return confirm('Are you sure? This will DELETE your private key from the SE050!');">
+        Wipe Key from SE050
+    </a>
+</div>
+</div>
+{% endblock %}

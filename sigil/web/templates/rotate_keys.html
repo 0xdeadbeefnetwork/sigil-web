@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2>SCP03 Key Rotation</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+        SCP03 keys encrypt all communication between this device and the SE050 secure element.
+        Factory default keys are publicly known and must be rotated for production use.
+    </p>
+
+    {% if new_keys %}
+    {# === POST-ROTATION: Show new keys for backup === #}
+    <div class="card" style="border: 2px solid var(--accent); margin-bottom: 20px;">
+        <div class="card-title" style="color: var(--accent);">NEW KEYS — BACK THESE UP NOW</div>
+        <p style="margin-bottom: 15px; color: var(--accent-red); font-weight: bold;">
+            These keys will NOT be shown again. Loss of these keys = device permanently bricked.
+        </p>
+
+        <div class="form-group">
+            <label>ENC Key <span style="color: var(--text-dim);">(KCV: {{ new_keys.kcv.enc }})</span></label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" class="form-control" value="{{ new_keys.enc }}" readonly
+                       style="font-family: monospace; font-size: 14px; letter-spacing: 1px;">
+                <button onclick="copyToClipboard('{{ new_keys.enc }}', this)"
+                        class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>MAC Key <span style="color: var(--text-dim);">(KCV: {{ new_keys.kcv.mac }})</span></label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" class="form-control" value="{{ new_keys.mac }}" readonly
+                       style="font-family: monospace; font-size: 14px; letter-spacing: 1px;">
+                <button onclick="copyToClipboard('{{ new_keys.mac }}', this)"
+                        class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>DEK Key <span style="color: var(--text-dim);">(KCV: {{ new_keys.kcv.dek }})</span></label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" class="form-control" value="{{ new_keys.dek }}" readonly
+                       style="font-family: monospace; font-size: 14px; letter-spacing: 1px;">
+                <button onclick="copyToClipboard('{{ new_keys.dek }}', this)"
+                        class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+            </div>
+        </div>
+
+        <p style="margin-top: 15px; color: var(--text-dim);">
+            Keys saved to <code>~/.se050-wallet/scp03.key</code> and <code>scp03_keys.json</code>
+        </p>
+
+        <div class="alert alert-warning" style="margin-top: 15px;">
+            <strong>Service restart required.</strong> The SIGIL service needs to be restarted
+            to use the new keys. Run: <code>sudo systemctl restart sigil</code>
+        </div>
+    </div>
+
+    <a href="{{ url_for('settings_bp.settings') }}" class="btn btn-primary">Return to Settings</a>
+
+    {% else %}
+    {# === PRE-ROTATION: Status + confirmation form === #}
+
+    {# Current key status #}
+    <div class="card" style="border: 1px solid {% if factory_keys %}var(--accent-red){% else %}var(--accent){% endif %}; margin-bottom: 20px;">
+        <div class="card-title">Current Key Status</div>
+        {% if factory_keys %}
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <span style="font-size: 24px;">&#9888;</span>
+            <span style="color: var(--accent-red); font-weight: bold; font-size: 16px;">FACTORY DEFAULT KEYS (INSECURE)</span>
+        </div>
+        <p style="color: var(--text-secondary);">
+            Your SE050 is using the publicly known NXP factory keys. Anyone with physical
+            or network access to the USB/I2C bus can intercept and modify SE050 communication.
+            <strong>Rotate immediately.</strong>
+        </p>
+        {% else %}
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <span style="font-size: 24px; color: var(--accent);">&#10003;</span>
+            <span style="color: var(--accent); font-weight: bold; font-size: 16px;">Custom keys active</span>
+        </div>
+        <p style="color: var(--text-secondary);">
+            Keys have been rotated from factory defaults. You can rotate again if needed.
+        </p>
+        {% endif %}
+        <div style="margin-top: 10px; font-family: monospace; font-size: 13px; color: var(--text-dim);">
+            ENC KCV: {{ current_kcv.enc }} &nbsp;|&nbsp; MAC KCV: {{ current_kcv.mac }}
+        </div>
+    </div>
+
+    {# What happens during rotation #}
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-title">What happens during rotation?</div>
+        <ol style="padding-left: 20px; color: var(--text-secondary); line-height: 1.8;">
+            <li>Three new 16-byte AES keys are generated using a cryptographic random number generator</li>
+            <li>An ISD-mode SCP03 session is opened with your current keys</li>
+            <li>A GlobalPlatform PUT KEY command sends the new keys (encrypted with the current DEK)</li>
+            <li>The SE050 replaces its stored keys atomically</li>
+            <li>New keys are saved to <code>~/.se050-wallet/</code> and displayed for backup</li>
+        </ol>
+    </div>
+
+    {# Danger zone form #}
+    <div class="card" style="border: 1px solid var(--accent-red);">
+        <div class="card-title" style="color: var(--accent-red);">ROTATE SCP03 KEYS</div>
+        <ul style="margin: 10px 0 20px; padding-left: 20px; color: var(--accent-red);">
+            <li>New keys will be shown <strong>ONCE</strong> after rotation</li>
+            <li><strong>Loss of keys = device permanently bricked</strong> (no recovery possible)</li>
+            <li>Back up the new keys before closing the results page</li>
+            <li>The SIGIL service must be restarted after rotation</li>
+        </ul>
+
+        <form method="POST" data-loading="Rotating keys...">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+            {% if pin_required %}
+            <div class="form-group">
+                <label style="color: #ffff00;">Signing PIN Required</label>
+                <input type="password" name="signing_pin" class="form-control"
+                       placeholder="Enter signing PIN to authorize" required>
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label>Type ROTATE to confirm:</label>
+                <input type="text" name="confirm" class="form-control" placeholder="ROTATE" autocomplete="off" required>
+            </div>
+
+            <button type="submit" class="btn btn-danger"
+                    onclick="return confirm('This will replace your SE050 SCP03 keys. Make sure you can back up the new keys. Continue?')">
+                Rotate SCP03 Keys
+            </button>
+            <a href="{{ url_for('settings_bp.settings') }}" class="btn" style="margin-left: 10px;">Cancel</a>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+# SIGIL Python Dependencies
+flask>=2.0.0
+gunicorn>=21.0.0
+requests>=2.28.0
+pysocks>=1.7.0
+qrcode>=7.0
+pillow>=9.0.0

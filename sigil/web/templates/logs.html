@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+<h2 style="margin-bottom: 20px; color: #00ffff;">// SYSTEM LOGS</h2>
+
+<div class="card" style="margin-bottom: 20px;">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <a href="{{ url_for('logs_bp.logs', log_type='access') }}" class="btn {% if log_type == 'access' %}btn-primary{% endif %}">Access Log</a>
+        <a href="{{ url_for('logs_bp.logs', log_type='error') }}" class="btn {% if log_type == 'error' %}btn-primary{% endif %}">Error Log</a>
+        <a href="{{ url_for('logs_bp.logs', log_type='honeypot') }}" class="btn {% if log_type == 'honeypot' %}btn-primary{% endif %}" style="border-color: #ff0040; {% if log_type == 'honeypot' %}background: #ff0040;{% else %}color: #ff0040;{% endif %}">Honeypot</a>
+        <span style="margin-left: auto; color: #666;">{{ lines|length }} lines</span>
+        <form method="POST" action="{{ url_for('logs_bp.clear_logs', log_type=log_type) }}" style="margin: 0;" onsubmit="return confirm('Clear {{ log_type }} log?');">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger" style="padding: 8px 12px;">Clear</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">// {{ log_type|upper }} LOG</div>
+    <div style="background: #000; border: 1px solid #00ff4144; padding: 15px; max-height: 500px; overflow-y: auto; font-family: monospace; font-size: 11px; line-height: 1.6;">
+        {% if lines %}
+            {% for line in lines %}
+                <div style="color: {% if 'ERROR' in line or 'error' in line %}#ff0040{% elif 'WARNING' in line or 'warn' in line %}#ffff00{% elif log_type == 'honeypot' %}#ff0040{% else %}#00ff41{% endif %}; word-break: break-all; padding: 2px 0; border-bottom: 1px solid #00ff4111;">{{ line }}</div>
+            {% endfor %}
+        {% else %}
+            <div style="color: #666; text-align: center; padding: 40px;">No log entries</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <div class="card-title">// LOG PATHS</div>
+    <table>
+        <tr><td style="color: #666;">Access Log</td><td class="mono">/var/log/sigil/access.log</td></tr>
+        <tr><td style="color: #666;">Error Log</td><td class="mono">/var/log/sigil/error.log</td></tr>
+        <tr><td style="color: #666;">Honeypot Log</td><td class="mono">~/.sigil/honeypot.log</td></tr>
+    </table>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2 style="margin-bottom: 20px;">Send Bitcoin</h2>
+
+    <div class="grid grid-2">
+        <div class="card">
+            <form method="POST" data-loading="Signing with SE050...">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label>Recipient Address</label>
+                    <input type="text" name="address" class="form-control"
+                           placeholder="bc1q..." required>
+                </div>
+
+                <div class="form-group">
+                    <label>Amount (sats)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="number" name="amount" id="amount" class="form-control"
+                               placeholder="100000" min="1" style="flex: 1;">
+                        <button type="button" class="btn" onclick="setMaxAmount()"
+                                style="background: var(--accent-blue);">Max</button>
+                    </div>
+                    <div class="text-dim" style="margin-top: 5px; font-size: 12px;">
+                        Max sendable: <span id="max-amount">0</span> sats
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Fee Rate (sat/vB)</label>
+                    <select name="fee_rate" id="fee_rate" class="form-control" onchange="updateMax()">
+                        <option value="{{ fees.get('hourFee', 1) }}">
+                            Economy ({{ fees.get('hourFee', 1) }} sat/vB)
+                        </option>
+                        <option value="{{ fees.get('halfHourFee', 2) }}" selected>
+                            Normal ({{ fees.get('halfHourFee', 2) }} sat/vB)
+                        </option>
+                        <option value="{{ fees.get('fastestFee', 5) }}">
+                            Fast ({{ fees.get('fastestFee', 5) }} sat/vB)
+                        </option>
+                    </select>
+                </div>
+
+                <input type="hidden" name="send_max" id="send_max" value="0">
+
+                {% if pin_required %}
+                <div class="form-group">
+                    <label>Signing PIN</label>
+                    <input type="password" name="signing_pin" class="form-control"
+                           placeholder="Enter signing PIN to authorize" required>
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn btn-danger" style="width: 100%;">
+                    Sign & Broadcast
+                </button>
+            </form>
+            <script>
+                var balance = {{ balance_sats }};
+                var numUtxos = {{ utxos|length }};
+                function calcFee(rate) {
+                    var vsize = 10 + (68 * Math.max(1, numUtxos)) + 31;
+                    return vsize * rate;
+                }
+                function updateMax() {
+                    var rate = parseInt(document.getElementById('fee_rate').value) || 1;
+                    var fee = calcFee(rate);
+                    var max = balance - fee;
+                    if (max < 0) max = 0;
+                    document.getElementById('max-amount').textContent = max;
+                }
+                function setMaxAmount() {
+                    var rate = parseInt(document.getElementById('fee_rate').value) || 1;
+                    var fee = calcFee(rate);
+                    var max = balance - fee;
+                    if (max < 546) { alert('Balance too low after fees'); return; }
+                    document.getElementById('amount').value = max;
+                    document.getElementById('send_max').value = '1';
+                }
+                updateMax();
+            </script>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Available Balance</div>
+            <div class="balance-amount">{{ "{:,}".format(balance_sats) }}</div>
+            <div class="balance-btc">{{ "%.8f"|format(balance_btc) }} BTC</div>
+
+            <div style="margin-top: 30px;">
+                <div class="card-title">UTXOs</div>
+                <div class="table-responsive">
+                <table>
+                    {% for utxo in utxos[:5] %}
+                    <tr>
+                        <td class="mono">{{ utxo.txid[:12] }}...</td>
+                        <td>{{ "{:,}".format(utxo.value) }} sats</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-warning">
+        <strong>Warning:</strong> Transactions are irreversible. Double-check the address and amount.
+        Signing happens on your SE050 hardware - private key never exposed.
+    </div>
+</div>
+{% endblock %}

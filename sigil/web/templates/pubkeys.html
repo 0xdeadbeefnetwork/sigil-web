@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+<style>
+.pk-container{background:#0a0a0f;border:1px solid var(--border);border-radius:8px;padding:20px;height:70vh;overflow-y:auto}
+.pk-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid var(--border)}
+.pk-header h2{color:#ff4757;margin:0;font-size:18px}
+.pk-stats{display:flex;gap:30px;font-size:13px}
+.pk-stat{color:#888}.pk-stat span{color:#00d4aa;font-weight:bold}
+.pk-item{display:flex;justify-content:space-between;align-items:center;padding:10px 15px;margin:5px 0;background:#12121a;border-radius:6px;border-left:3px solid #f7931a;animation:pkSlide .3s ease;font-family:monospace}
+@keyframes pkSlide{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.pk-hex{color:#f7931a;font-size:11px;word-break:break-all;flex:1}
+.pk-meta{display:flex;gap:15px;font-size:11px;color:#888;margin-left:20px}
+.pk-type{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold}
+.pk-segwit{background:#3498db33;color:#3498db}
+.pk-legacy{background:#9b59b633;color:#9b59b6}
+.pk-status{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:bold}
+.pk-on{background:#00d4aa22;color:#00d4aa;border:1px solid #00d4aa}
+.pk-off{background:#ff475722;color:#ff4757;border:1px solid #ff4757}
+.pk-warn{background:linear-gradient(135deg,#ff475722,#f7931a22);border:1px solid #ff4757;border-radius:8px;padding:15px 20px;margin-bottom:20px}
+.pk-warn h3{color:#ff4757;margin:0 0 5px 0;font-size:14px}
+.pk-warn p{color:#888;margin:0;font-size:12px}
+</style>
+<div class="pk-warn"><h3>LIVE PUBKEY EXPOSURE</h3><p>Every Bitcoin spend reveals the sender's public key. Watching the mempool RIGHT NOW.</p></div>
+<div class="pk-header"><h2>EXPOSED PUBLIC KEYS</h2><div class="pk-stats"><div class="pk-stat">Count: <span id="pkcount">0</span></div><div class="pk-status pk-off" id="pkstatus">CONNECTING</div></div></div>
+<div class="pk-container" id="pklist"><div style="color:#888;text-align:center;padding:40px">Connecting to mempool...</div></div>
+<script>
+(function(){
+    var c=0, seen=new Set(), list=document.getElementById('pklist'),
+        cEl=document.getElementById('pkcount'), sEl=document.getElementById('pkstatus');
+    var baseInterval=2000, maxInterval=30000, currentInterval=baseInterval, errorCount=0;
+
+    function add(pk,t,tx){
+        if(seen.has(pk))return;
+        seen.add(pk);
+        if(seen.size>500) seen.delete(seen.values().next().value);
+        c++; cEl.textContent=c;
+        if(c===1) list.innerHTML='';
+        var d=document.createElement('div');
+        d.className='pk-item';
+        var tc=t==='witness'?'pk-segwit':'pk-legacy',
+            tl=t==='witness'?'SEGWIT':'LEGACY';
+        d.innerHTML='<div class="pk-hex">'+pk+'</div><div class="pk-meta"><span class="pk-type '+tc+'">'+tl+'</span><span>'+tx.substring(0,8)+'...</span></div>';
+        list.insertBefore(d,list.firstChild);
+        while(list.children.length>100) list.removeChild(list.lastChild);
+    }
+
+    function poll(){
+        fetch('/pubkeys/stream').then(function(r){return r.json()}).then(function(d){
+            errorCount=0;
+            currentInterval=baseInterval;
+            if(d.connected){
+                sEl.className='pk-status pk-on'; sEl.textContent='LIVE';
+            } else {
+                sEl.className='pk-status pk-off'; sEl.textContent='OFFLINE';
+            }
+            if(d.pubkeys) d.pubkeys.forEach(function(p){add(p.pubkey,p.type,p.txid)});
+            schedulePoll();
+        }).catch(function(){
+            errorCount++;
+            currentInterval=Math.min(baseInterval*Math.pow(2,errorCount), maxInterval);
+            sEl.className='pk-status pk-off';
+            sEl.textContent='RETRY '+Math.round(currentInterval/1000)+'s';
+            schedulePoll();
+        });
+    }
+
+    function schedulePoll(){
+        setTimeout(poll, currentInterval);
+    }
+
+    poll();
+})();
+</script>
+</div>
+{% endblock %}

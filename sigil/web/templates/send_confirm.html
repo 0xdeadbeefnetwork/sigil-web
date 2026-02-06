@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2 style="margin-bottom: 20px;">Confirm Transaction</h2>
+
+    <div class="card">
+        <div class="card-title">Transaction Details</div>
+
+        <div class="table-responsive">
+        <table>
+            <tr>
+                <td style="width: 150px;">To Address</td>
+                <td class="mono">{{ to_address }}</td>
+            </tr>
+            <tr>
+                <td>Amount</td>
+                <td class="text-danger" style="font-size: 18px;">
+                    -{{ "{:,}".format(amount) }} sats
+                </td>
+            </tr>
+            <tr>
+                <td>Fee</td>
+                <td>{{ "{:,}".format(fee) }} sats ({{ fee_rate }} sat/vB)</td>
+            </tr>
+            <tr>
+                <td>Total</td>
+                <td style="font-size: 18px; font-weight: bold;">
+                    {{ "{:,}".format(amount + fee) }} sats
+                </td>
+            </tr>
+        </table>
+        </div>
+
+        <div style="margin-top: 30px; display: flex; gap: 15px;">
+            <form method="POST" action="{{ url_for('dashboard_bp.send_broadcast') }}" data-loading="Broadcasting...">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="tx_hex" value="{{ tx_hex }}">
+                <button type="submit" class="btn btn-danger">Broadcast Transaction</button>
+            </form>
+            <a href="{{ url_for('dashboard_bp.send') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

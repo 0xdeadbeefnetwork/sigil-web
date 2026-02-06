@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIGIL - {{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sigil.css') }}">
+</head>
+<body>
+    {% if session.authenticated %}
+    <header>
+        <div class="header-content">
+            <a href="{{ url_for('dashboard_bp.dashboard') }}" class="logo"><svg class="sigil-mark" viewBox="0 0 32 32" width="28" height="28"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="2" x2="16" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="22" x2="16" y2="30" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="16" x2="10" y2="16" stroke="currentColor" stroke-width="1.5"/><line x1="22" y1="16" x2="30" y2="16" stroke="currentColor" stroke-width="1.5"/><line x1="6.1" y1="6.1" x2="11.8" y2="11.8" stroke="currentColor" stroke-width="1"/><line x1="20.2" y1="20.2" x2="25.9" y2="25.9" stroke="currentColor" stroke-width="1"/><line x1="25.9" y1="6.1" x2="20.2" y2="11.8" stroke="currentColor" stroke-width="1"/><line x1="11.8" y1="20.2" x2="6.1" y2="25.9" stroke="currentColor" stroke-width="1"/></svg>SIGIL</a>
+            {% if connection_status == 'onion' %}<span class="tor-badge tor-on">🧅 ONION</span>{% elif connection_status == 'localhost' %}<span class="tor-badge tor-local">🏠 LOCAL</span>{% else %}<span class="tor-badge tor-off">⚠️ CLEARNET</span>{% endif %}
+            <nav>
+                <a href="{{ url_for('dashboard_bp.dashboard') }}" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
+
+                <div class="nav-dropdown">
+                    <a class="{{ 'active' if active in ['receive', 'send', 'history'] else '' }}">Wallet</a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('dashboard_bp.receive') }}">Receive</a>
+                        <a href="{{ url_for('dashboard_bp.send') }}">Send</a>
+                        <a href="{{ url_for('dashboard_bp.history') }}">History</a>
+                    </div>
+                </div>
+
+                <div class="nav-dropdown">
+                    <a class="{{ 'active' if active in ['tumbler', 'privacy', 'pubkeys', 'sign'] else '' }}">Tools</a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('tumbler_bp.tumbler') }}">Tumbler</a>
+                        <a href="{{ url_for('privacy_bp.privacy_analyzer') }}">Privacy</a>
+                        <a href="{{ url_for('pubkeys_bp.pubkeys_page') }}">Pubkeys</a>
+                        <a href="{{ url_for('signing_bp.sign_message') }}">Sign Message</a>
+                    </div>
+                </div>
+
+                <div class="nav-dropdown">
+                    <a class="{{ 'active' if active in ['verify', 'canary'] else '' }}">Security</a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('wallet_mgmt_bp.verify_se050') }}">SE050 Slots</a>
+                        <a href="{{ url_for('privacy_bp.canary') }}">Canary</a>
+                    </div>
+                </div>
+
+                <div class="nav-dropdown">
+                    <a class="{{ 'active' if active in ['logs', 'settings'] else '' }}">System</a>
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('logs_bp.logs') }}">Logs</a>
+                        <a href="{{ url_for('settings_bp.settings') }}">Settings</a>
+                        <a href="{{ url_for('auth_bp.logout') }}" style="color: var(--accent-red);">Logout</a>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+    {% endif %}
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer>
+        <p>SIGIL v{{ version }} | SE050 Hardware Wallet</p>
+        <p>"Privacy is necessary for an open society in the electronic age."</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/sigil.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

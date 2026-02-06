@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2 style="margin-bottom: 20px;">Receive Bitcoin</h2>
+
+    <div class="grid grid-2">
+        <div class="card" style="text-align: center;">
+            <div class="card-title">QR Code</div>
+            <div class="qr-container">
+                <img src="{{ url_for('qr_bp.qr_code', data=address) }}"
+                     alt="QR Code" width="200" height="200" style="image-rendering: pixelated;">
+            </div>
+            <p class="text-dim">Scan to receive Bitcoin</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Address #{{ index }}</div>
+            <div class="address" style="margin-bottom: 15px;">{{ address }}</div>
+            <button class="copy-btn" onclick="copyToClipboard('{{ address }}', this)">Copy Address</button>
+
+            <div style="margin-top: 30px;">
+                <div class="card-title">Derivation Path</div>
+                <p class="mono text-dim">{{ path }}</p>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <form method="GET" style="display: flex; gap: 10px; align-items: end;">
+                    <div class="form-group" style="margin: 0; flex: 1;">
+                        <label>Address Index</label>
+                        <input type="number" name="index" value="{{ index }}"
+                               class="form-control" min="0" max="999">
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Get Address</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Address Formats</div>
+        <div class="table-responsive">
+        <table>
+            <tr>
+                <td style="width: 150px;">Native SegWit</td>
+                <td class="mono">{{ address }}</td>
+                <td><button class="copy-btn" onclick="copyToClipboard('{{ address }}', this)">Copy</button></td>
+            </tr>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

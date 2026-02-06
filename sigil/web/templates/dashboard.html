@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <div class="grid grid-3">
+        <div class="card">
+            <div class="card-title">Balance</div>
+            <div class="balance-amount">{{ "{:,}".format(balance_sats) }}</div>
+            <div class="balance-btc">{{ "%.8f"|format(balance_btc) }} BTC</div>
+            {% if btc_price %}
+            <div class="text-dim" style="margin-top: 10px;">
+                ≈ ${{ "%.2f"|format(balance_btc * btc_price) }} USD
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <div class="card-title">SE050 Status</div>
+            <p><span class="status status-success">Connected</span></p>
+            <p class="text-dim" style="margin-top: 15px;">
+                UID: <span class="mono">{{ uid[:16] }}...</span>
+            </p>
+            <p class="text-dim">
+                Key Slot: <span class="mono">0x{{ key_slot }}</span>
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Network</div>
+            <p style="font-size: 24px; font-weight: bold;">
+                {% if network == 'mainnet' %}
+                <span class="text-warning">MAINNET</span>
+                {% else %}
+                <span class="text-dim">TESTNET</span>
+                {% endif %}
+            </p>
+            <p class="text-dim" style="margin-top: 15px;">
+                UTXOs: {{ utxo_count }}
+            </p>
+            <p class="text-dim">
+                Tor: <span class="text-success">Active</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Quick Actions</div>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+            <a href="{{ url_for('dashboard_bp.receive') }}" class="btn btn-success">Receive Bitcoin</a>
+            <a href="{{ url_for('dashboard_bp.send') }}" class="btn btn-primary">Send Bitcoin</a>
+            <a href="{{ url_for('signing_bp.sign_message') }}" class="btn btn-secondary">Sign Message</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Receive Address</div>
+        <div class="address">{{ address }}</div>
+        <button class="copy-btn" onclick="copyToClipboard('{{ address }}', this)">Copy</button>
+    </div>
+
+    {% if recent_txs %}
+    <div class="card">
+        <div class="card-title">Recent Transactions</div>
+        <div class="table-responsive">
+        <table>
+            <tr>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Time</th>
+            </tr>
+            {% for tx in recent_txs[:5] %}
+            <tr>
+                <td>
+                    {% if tx.received > tx.sent %}
+                    <span class="text-success">↓ Receive</span>
+                    {% else %}
+                    <span class="text-danger">↑ Send</span>
+                    {% endif %}
+                </td>
+                <td>{{ "{:,}".format(tx.net|abs) }} sats</td>
+                <td>
+                    {% if tx.confirmed %}
+                    <span class="status status-success">Confirmed</span>
+                    {% else %}
+                    <span class="status status-pending">Pending</span>
+                    {% endif %}
+                </td>
+                <td class="text-dim">{{ tx.time }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

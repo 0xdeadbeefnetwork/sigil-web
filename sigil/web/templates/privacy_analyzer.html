@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="content-section">
+    <h2>Transaction Privacy Analyzer</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+        Analyze any transaction for privacy leaks and fingerprinting risks.
+    </p>
+
+    <form method="POST">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label>Transaction ID</label>
+            <input type="text" name="txid" class="form-control"
+                   placeholder="Enter txid to analyze..."
+                   value="{{ txid or '' }}"
+                   style="font-family: monospace;">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Analyze Privacy</button>
+    </form>
+
+    {% if score %}
+    <div style="margin-top: 30px;">
+        <h3>Privacy Score:
+            <span style="font-size: 48px; color: {% if score.score >= 80 %}var(--accent){% elif score.score >= 60 %}var(--accent-yellow){% else %}var(--accent-red){% endif %};">
+                {{ score.grade() }}
+            </span>
+            <span style="color: var(--text-secondary);">({{ score.score }}/100)</span>
+        </h3>
+
+        {% if score.issues %}
+        <div class="alert alert-danger" style="margin-top: 20px;">
+            <strong>Critical Issues:</strong>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+            {% for issue in score.issues %}
+                <li><strong>{{ issue.category }}:</strong> {{ issue.description }} (-{{ issue.points }} pts)</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if score.warnings %}
+        <div class="alert alert-warning" style="margin-top: 20px;">
+            <strong>Privacy Concerns:</strong>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+            {% for w in score.warnings %}
+                <li><strong>{{ w.category }}:</strong> {{ w.description }} (-{{ w.points }} pts)</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if score.good %}
+        <div class="alert alert-success" style="margin-top: 20px;">
+            <strong>Good Practices:</strong>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+            {% for g in score.good %}
+                <li><strong>{{ g.category }}:</strong> {{ g.description }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <h3 style="margin-top: 30px;">Recommendations</h3>
+        <ul>
+        {% for rec in recommendations %}
+            <li>{{ rec }}</li>
+        {% endfor %}
+        </ul>
+
+        {% if score.tx_data %}
+        <details style="margin-top: 20px;">
+            <summary style="cursor: pointer; color: var(--accent);">View Raw Transaction Data</summary>
+            <pre style="background: var(--bg-secondary); padding: 15px; margin-top: 10px; overflow-x: auto; font-size: 11px;">{{ score.tx_data | tojson(indent=2) }}</pre>
+        </details>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
