@@ -368,12 +368,18 @@ def clear_all_electrum_pins():
 @login_required
 @csrf_required
 def refresh_electrum_peers():
-    """Manually trigger Electrum peer discovery"""
-    try:
-        use_tor = Config.TOR_ENABLED if hasattr(Config, 'TOR_ENABLED') else False
-        client = get_client(network=Config.NETWORK, use_tor=use_tor)
-        peer_count = get_cached_peer_count(Config.NETWORK)
-        flash(f'Peer discovery complete — {peer_count} peers found', 'success')
-    except Exception as e:
-        flash(f'Peer discovery failed: {e}', 'error')
+    """Manually trigger Electrum peer discovery in a background thread"""
+    import threading
+
+    def _bg_discover():
+        try:
+            use_tor = Config.TOR_ENABLED if hasattr(Config, 'TOR_ENABLED') else False
+            client = get_client(network=Config.NETWORK, use_tor=use_tor)
+            # get_client() already triggers _discover_and_cache_peers on connect
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_bg_discover, daemon=True)
+    t.start()
+    flash('Peer discovery started in background — refresh page in a few seconds to see results', 'success')
     return redirect(url_for('settings_bp.settings'))
