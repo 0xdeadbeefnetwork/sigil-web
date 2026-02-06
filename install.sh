@@ -127,6 +127,30 @@ TOREOF
     exit 0
 }
 
+bootstrap_repo() {
+    # If running from curl pipe or standalone download, clone the repo first
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+
+    if [ -z "$SCRIPT_DIR" ] || [ ! -d "$SCRIPT_DIR/sigil" ]; then
+        log_info "Bootstrapping: cloning SIGIL repository..."
+        apt-get update -qq
+        apt-get install -y -qq git > /dev/null
+
+        CLONE_DIR=$(mktemp -d)
+        git clone --depth 1 https://github.com/0xdeadbeefnetwork/sigil-web.git "$CLONE_DIR" 2>/dev/null
+
+        if [ ! -f "$CLONE_DIR/install.sh" ]; then
+            log_error "Failed to clone repository"
+            rm -rf "$CLONE_DIR"
+            exit 1
+        fi
+
+        log_info "Re-executing installer from cloned repo..."
+        cd "$CLONE_DIR"
+        exec bash "$CLONE_DIR/install.sh" "$@"
+    fi
+}
+
 confirm_settings() {
     echo ""
     echo -e "${CYAN}Installation Settings:${NC}"
@@ -575,6 +599,7 @@ print_success() {
 
 print_banner
 check_root
+bootstrap_repo "$@"
 
 # Handle --regen-onion: standalone operation on existing install
 if [ "$REGEN_ONION" = true ]; then

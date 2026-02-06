@@ -106,12 +106,15 @@ The FRDM-K64F runs NXP's VCOM firmware, exposing the SE050 as a USB serial devic
 ## Quick Start
 
 ```bash
-# Clone
+# One-liner install
+curl -sL https://raw.githubusercontent.com/0xdeadbeefnetwork/sigil-web/main/install.sh \
+  | sudo bash -s -- --tor-source
+
+# Or manual
 git clone https://github.com/0xdeadbeefnetwork/sigil-web.git
 cd sigil-web
-
-# Install (handles everything: deps, I2C, systemd, Tor, credentials)
-sudo ./install.sh
+sudo ./install.sh              # Tor from apt
+sudo ./install.sh --tor-source # Compile Tor from source
 
 # Access
 # Local: http://127.0.0.1:5000
@@ -119,6 +122,11 @@ sudo ./install.sh
 ```
 
 The installer will prompt for a web login password and optional signing PIN.
+
+Regenerate your .onion address if it's ever leaked:
+```bash
+sudo ./install.sh --regen-onion
+```
 
 ## Project Structure
 
