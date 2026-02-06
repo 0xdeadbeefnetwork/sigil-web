@@ -67,7 +67,7 @@ SIGIL is a Bitcoin hardware wallet using the NXP SE050 secure element. This docu
 |--------|------------|
 | API response manipulation | Transaction data verified before signing; Electrum uses multiple servers |
 | Traffic analysis / IP leak | Tor integration via SOCKS5 proxy on all outbound connections |
-| MITM on API calls | HTTPS + Tor onion routing; Electrum SSL certificate pinning |
+| MITM on API calls | Tor onion routing provides end-to-end encryption; Electrum uses TLS but with `CERT_NONE` (no verification) |
 | Malicious Electrum server | Amount/script verification before signing; server rotation |
 
 ### 2. Host System Compromise
