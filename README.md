@@ -244,7 +244,7 @@ SCP03 keys are stored in `~/.se050-wallet/`:
 4. **Optional Tor** for network privacy (all API calls, Electrum connections)
 5. **Signing PIN** adds a second factor before any signing operation
 
-See [THREAT_MODEL.md](THREAT_MODEL.md) for detailed security analysis.
+See [THREAT_MODEL.md](docs/THREAT_MODEL.md) for detailed security analysis.
 
 ## SCP03 Key Rotation
 
