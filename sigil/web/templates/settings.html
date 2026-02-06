@@ -105,7 +105,19 @@
 </div>
 
 <div class="card">
-    <div class="card-title">Electrum Certificate Pins (TOFU)</div>
+    <div class="card-title">Electrum Network</div>
+    <div style="margin-bottom: 15px; padding: 10px; background: #00ff4111; border: 1px solid #00ff4133;">
+        <span style="color: #00ffff; font-size: 12px;">DISCOVERED PEERS:</span>
+        <span class="mono" style="color: #00ff41; font-size: 14px; margin-left: 8px;">{{ electrum_peer_count }}</span>
+        <span style="color: #666; font-size: 11px; margin-left: 8px;">
+            {% if electrum_peer_count > 0 %}
+            (cached — refreshed every 24h via server.peers.subscribe)
+            {% else %}
+            (will discover on first Electrum connection)
+            {% endif %}
+        </span>
+    </div>
+    <div class="card-title" style="font-size: 13px; margin-top: 15px;">Certificate Pins (TOFU)</div>
     <p style="color: #999; font-size: 12px; margin-bottom: 15px;">
         Server TLS certificates are pinned on first connection (Trust On First Use).
         If a certificate changes unexpectedly, the connection is refused to prevent MITM attacks.

@@ -2,7 +2,8 @@
 """
 Minimal Electrum Client for SIGIL
 =================================
-Lightweight Electrum protocol client with Tor support and TOFU certificate pinning.
+Lightweight Electrum protocol client with Tor support, TOFU certificate pinning,
+and peer discovery via server.peers.subscribe.
 
 Certificate Pinning (Trust On First Use):
   On first SSL connection to a server, the server's certificate fingerprint
@@ -10,6 +11,12 @@ Certificate Pinning (Trust On First Use):
   On subsequent connections, the fingerprint is verified against the stored pin.
   If the fingerprint changes, the connection is refused (possible MITM).
   Pins can be cleared per-server or entirely via the web UI settings.
+
+Peer Discovery:
+  After connecting to any server, SIGIL calls server.peers.subscribe to discover
+  additional peers. Discovered peers are cached in ~/.sigil/electrum_peers.json
+  and used on subsequent connections (shuffled for load balancing). The cache
+  expires after 24 hours.  Hardcoded seed servers are used as fallback.
 """
 
 import json
@@ -17,25 +24,38 @@ import socket
 import ssl
 import hashlib
 import time
+import secrets
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from sigil.crypto.encoding import bech32_decode, b58check_decode
 
-# Mainnet Electrum servers (host, tcp_port, ssl_port, onion)
-MAINNET_SERVERS = [
+# =========================================================================
+#                    SEED SERVERS (FALLBACK)
+# =========================================================================
+
+# Hardcoded seed servers — used only when no cached peers are available.
+# Format: (host, tcp_port, ssl_port, onion_host_or_None)
+MAINNET_SEEDS = [
     ("electrum.blockstream.info", 50001, 50002, None),
     ("electrum.emzy.de", 50001, 50002, None),
     ("bolt.schulzemic.net", 50001, 50002, None),
+    ("electrum.jochen-hoenicke.de", 50001, 50002, None),
+    ("2ex.electrum.be", 50001, 50002, None),
 ]
 
-TESTNET_SERVERS = [
+TESTNET_SEEDS = [
     ("electrum.blockstream.info", 60001, 60002, None),
 ]
 
-# Pin storage location
+# =========================================================================
+#                    FILE PATHS
+# =========================================================================
+
 _SIGIL_DIR = Path.home() / ".sigil"
 _PINS_FILE = _SIGIL_DIR / "electrum_pins.json"
+_PEERS_FILE = _SIGIL_DIR / "electrum_peers.json"
+_PEERS_MAX_AGE = 86400  # 24 hours — re-discover after this
 
 
 # =========================================================================
@@ -127,8 +147,151 @@ def _verify_or_pin_cert(sock: ssl.SSLSocket, host: str, port: int) -> str:
     return fingerprint
 
 
+# =========================================================================
+#                    PEER DISCOVERY & CACHE
+# =========================================================================
+
+def _load_cached_peers(network: str) -> List[Tuple[str, int, int, Optional[str]]]:
+    """Load cached peer list from disk. Returns empty list if stale or missing."""
+    if not _PEERS_FILE.exists():
+        return []
+    try:
+        data = json.loads(_PEERS_FILE.read_text())
+        # Check age
+        cached_at = data.get("cached_at", 0)
+        if time.time() - cached_at > _PEERS_MAX_AGE:
+            return []  # Stale cache
+        peers = data.get(network, [])
+        # Convert back to tuples
+        return [(p[0], p[1], p[2], p[3]) for p in peers]
+    except (json.JSONDecodeError, OSError, IndexError, KeyError):
+        return []
+
+
+def _save_cached_peers(network: str, peers: List[Tuple[str, int, int, Optional[str]]]):
+    """Save discovered peers to disk cache"""
+    _SIGIL_DIR.mkdir(parents=True, exist_ok=True)
+    # Load existing data (may have other networks cached)
+    existing = {}
+    if _PEERS_FILE.exists():
+        try:
+            existing = json.loads(_PEERS_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    existing[network] = [list(p) for p in peers]
+    existing["cached_at"] = int(time.time())
+    _PEERS_FILE.write_text(json.dumps(existing, indent=2))
+    try:
+        _PEERS_FILE.chmod(0o600)
+    except OSError:
+        pass
+
+
+def _parse_peer_features(features: List[str]) -> Dict[str, Any]:
+    """
+    Parse Electrum peer feature strings.
+    Features: v=version, p=pruning, t=tcp port, s=ssl port
+    e.g. ["v1.4", "p10000", "t", "s"] → tcp=50001, ssl=50002
+    e.g. ["v1.4", "s50003"]           → tcp=None, ssl=50003
+    """
+    result = {"version": None, "tcp_port": None, "ssl_port": None, "pruning": None}
+    for f in features:
+        if not f:
+            continue
+        prefix = f[0]
+        rest = f[1:]
+        if prefix == 'v':
+            result["version"] = rest
+        elif prefix == 'p':
+            try:
+                result["pruning"] = int(rest)
+            except ValueError:
+                pass
+        elif prefix == 't':
+            result["tcp_port"] = int(rest) if rest else 50001
+        elif prefix == 's':
+            result["ssl_port"] = int(rest) if rest else 50002
+    return result
+
+
+def _discover_peers(client: 'ElectrumClient') -> List[Tuple[str, int, int, Optional[str]]]:
+    """
+    Call server.peers.subscribe on the connected server to discover peers.
+    Returns list of (host, tcp_port, ssl_port, onion) tuples.
+    """
+    try:
+        raw_peers = client._call("server.peers.subscribe")
+        if not raw_peers or not isinstance(raw_peers, list):
+            return []
+    except Exception:
+        return []
+
+    discovered = []
+    seen_hosts = set()
+
+    for entry in raw_peers:
+        try:
+            # Format: [ip_address, hostname, [features...]]
+            if len(entry) < 3:
+                continue
+            _ip, hostname, features = entry[0], entry[1], entry[2]
+
+            if not hostname or not isinstance(features, list):
+                continue
+
+            # Skip if we already have this host
+            if hostname in seen_hosts:
+                continue
+            seen_hosts.add(hostname)
+
+            parsed = _parse_peer_features(features)
+
+            # We need at least an SSL port (we prefer SSL)
+            ssl_port = parsed.get("ssl_port")
+            tcp_port = parsed.get("tcp_port")
+            if not ssl_port and not tcp_port:
+                continue
+
+            # Detect onion addresses
+            onion = None
+            if hostname.endswith('.onion'):
+                onion = hostname
+                hostname = hostname  # For onion, host IS the onion address
+
+            discovered.append((
+                hostname,
+                tcp_port or 50001,
+                ssl_port or 50002,
+                onion
+            ))
+
+        except (ValueError, TypeError, IndexError):
+            continue
+
+    return discovered
+
+
+def _shuffle_list(lst: list) -> list:
+    """Shuffle a list using CSPRNG (Fisher-Yates)"""
+    result = list(lst)
+    for i in range(len(result) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        result[i], result[j] = result[j], result[i]
+    return result
+
+
+def get_cached_peer_count(network: str = "mainnet") -> int:
+    """Get number of cached peers for display in UI"""
+    return len(_load_cached_peers(network))
+
+
+# =========================================================================
+#                    ELECTRUM CLIENT
+# =========================================================================
+
 class ElectrumClient:
-    """Minimal Electrum protocol client with TOFU certificate pinning"""
+    """Minimal Electrum protocol client with TOFU cert pinning and peer discovery"""
 
     def __init__(self, network="mainnet", use_tor=False, tor_proxy="127.0.0.1:9050", timeout=30):
         self.network = network
@@ -141,10 +304,20 @@ class ElectrumClient:
         self.server = None
         self._id = 0
 
-    def _get_servers(self):
-        if self.network == "testnet":
-            return TESTNET_SERVERS
-        return MAINNET_SERVERS
+    def _get_servers(self) -> List[Tuple[str, int, int, Optional[str]]]:
+        """
+        Get server list: cached discovered peers (shuffled) + seed servers as fallback.
+        """
+        net = "testnet" if self.network == "testnet" else "mainnet"
+        seeds = TESTNET_SEEDS if self.network == "testnet" else MAINNET_SEEDS
+
+        # Try cached peers first (shuffled for load balancing)
+        cached = _load_cached_peers(net)
+        if cached:
+            return _shuffle_list(cached) + seeds
+
+        # No cache — just use seeds (shuffled)
+        return _shuffle_list(list(seeds))
 
     def _create_socket(self, host, port, use_ssl=False):
         """Create socket, optionally through Tor SOCKS5, with TOFU cert pinning"""
@@ -174,7 +347,7 @@ class ElectrumClient:
         return sock
 
     def connect(self, server=None, port=None, use_ssl=True):
-        """Connect to an Electrum server"""
+        """Connect to an Electrum server, then discover peers for next time"""
         if self.sock:
             self.close()
 
@@ -199,6 +372,8 @@ class ElectrumClient:
 
                 result = self._call("server.version", ["SIGIL", "1.4"])
                 if result:
+                    # Connected! Now discover peers in the background
+                    self._discover_and_cache_peers()
                     return True
             except Exception as e:
                 if self.sock:
@@ -214,6 +389,16 @@ class ElectrumClient:
                 continue
 
         return False
+
+    def _discover_and_cache_peers(self):
+        """After connecting, discover peers and cache them for next time"""
+        net = "testnet" if self.network == "testnet" else "mainnet"
+        try:
+            peers = _discover_peers(self)
+            if peers:
+                _save_cached_peers(net, peers)
+        except Exception:
+            pass  # Non-fatal — we're already connected, peer discovery is best-effort
 
     def close(self):
         """Close connection"""

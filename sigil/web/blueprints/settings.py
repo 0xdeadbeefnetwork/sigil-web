@@ -27,7 +27,7 @@ from sigil.web.helpers import (
 )
 from sigil.web.security import csrf_required
 from sigil.web.session_mgmt import se050_session
-from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins
+from sigil.network.electrum import get_pinned_servers, clear_pin, clear_all_pins, get_cached_peer_count
 
 settings_bp = Blueprint('settings_bp', __name__)
 
@@ -83,8 +83,9 @@ def settings():
     except Exception:
         pass
 
-    # Load Electrum certificate pins
+    # Load Electrum certificate pins and peer count
     electrum_pins = get_pinned_servers()
+    electrum_peer_count = get_cached_peer_count(Config.NETWORK)
 
     return render_template(
         'settings.html',
@@ -95,6 +96,7 @@ def settings():
         exit_ip=exit_ip, is_tor=is_tor, tor_enabled=use_tor,
         signing_pin_active=signing_pin_enabled(), factory_keys=factory_keys,
         electrum_pins=electrum_pins,
+        electrum_peer_count=electrum_peer_count,
         session=session
     )
 
